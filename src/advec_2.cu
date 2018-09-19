@@ -115,6 +115,66 @@ namespace
     }
 
     template<typename TF>__global__
+    void advec_4s_g(TF* __restrict__ st1, TF* __restrict__ st2, TF* __restrict__ st3, TF* __restrict__ st4,
+                    TF* __restrict__ s1,  TF* __restrict__ s2,  TF* __restrict__ s3,  TF* __restrict__ s4,
+                    TF* __restrict__ u,  TF* __restrict__ v, TF* __restrict__ w,
+                    TF* __restrict__ rhoref, TF* __restrict__ rhorefh,
+                    TF* __restrict__ dzi, TF dxi, TF dyi,
+                    int jj, int kk,
+                    int istart, int jstart, int kstart,
+                    int iend,   int jend,   int kend)
+    {
+        const int i  = blockIdx.x*blockDim.x + threadIdx.x + istart;
+        const int j  = blockIdx.y*blockDim.y + threadIdx.y + jstart;
+        const int k  = blockIdx.z + kstart;
+        const int ii = 1;
+
+        if (i < iend && j < jend && k < kend)
+        {
+            const int ijk = i + j*jj + k*kk;
+            st1[ijk] +=
+                - (  u[ijk+ii] * interp2(s1[ijk   ], s1[ijk+ii])
+                   - u[ijk   ] * interp2(s1[ijk-ii], s1[ijk   ]) ) * dxi
+
+                - (  v[ijk+jj] * interp2(s1[ijk   ], s1[ijk+jj])
+                   - v[ijk   ] * interp2(s1[ijk-jj], s1[ijk   ]) ) * dyi
+
+                - (  rhorefh[k+1] * w[ijk+kk] * interp2(s1[ijk   ], s1[ijk+kk])
+                   - rhorefh[k  ] * w[ijk   ] * interp2(s1[ijk-kk], s1[ijk   ]) ) / rhoref[k] * dzi[k];
+
+            st2[ijk] +=
+                - (  u[ijk+ii] * interp2(s2[ijk   ], s2[ijk+ii])
+                   - u[ijk   ] * interp2(s2[ijk-ii], s2[ijk   ]) ) * dxi
+
+                - (  v[ijk+jj] * interp2(s2[ijk   ], s2[ijk+jj])
+                   - v[ijk   ] * interp2(s2[ijk-jj], s2[ijk   ]) ) * dyi
+
+                - (  rhorefh[k+1] * w[ijk+kk] * interp2(s2[ijk   ], s2[ijk+kk])
+                   - rhorefh[k  ] * w[ijk   ] * interp2(s2[ijk-kk], s2[ijk   ]) ) / rhoref[k] * dzi[k];
+
+            st3[ijk] +=
+                - (  u[ijk+ii] * interp2(s3[ijk   ], s3[ijk+ii])
+                   - u[ijk   ] * interp2(s3[ijk-ii], s3[ijk   ]) ) * dxi
+
+                - (  v[ijk+jj] * interp2(s3[ijk   ], s3[ijk+jj])
+                   - v[ijk   ] * interp2(s3[ijk-jj], s3[ijk   ]) ) * dyi
+
+                - (  rhorefh[k+1] * w[ijk+kk] * interp2(s3[ijk   ], s3[ijk+kk])
+                   - rhorefh[k  ] * w[ijk   ] * interp2(s3[ijk-kk], s3[ijk   ]) ) / rhoref[k] * dzi[k];
+
+            st4[ijk] +=
+                - (  u[ijk+ii] * interp2(s4[ijk   ], s4[ijk+ii])
+                   - u[ijk   ] * interp2(s4[ijk-ii], s4[ijk   ]) ) * dxi
+
+                - (  v[ijk+jj] * interp2(s4[ijk   ], s4[ijk+jj])
+                   - v[ijk   ] * interp2(s4[ijk-jj], s4[ijk   ]) ) * dyi
+
+                - (  rhorefh[k+1] * w[ijk+kk] * interp2(s4[ijk   ], s4[ijk+kk])
+                   - rhorefh[k  ] * w[ijk   ] * interp2(s4[ijk-kk], s4[ijk   ]) ) / rhoref[k] * dzi[k];
+        }
+    }
+
+    template<typename TF>__global__
     void calc_cfl_g(TF* __restrict__ u, TF* __restrict__ v, TF* __restrict__ w,
                     TF* __restrict__ cfl, TF* __restrict__ dzi, TF dxi, TF dyi,
                     int jj, int kk,
@@ -205,14 +265,24 @@ void Advec_2<TF>::exec()
         gd.iend,    gd.jend,   gd.kend);
     cuda_check_error();
 
-    for (auto& it : fields.st)
-        advec_s_g<TF><<<gridGPU, blockGPU>>>(
-            it.second->fld_g, fields.sp.at(it.first)->fld_g,
-            fields.mp.at("u")->fld_g, fields.mp.at("v")->fld_g, fields.mp.at("w")->fld_g,
-            fields.rhoref_g, fields.rhorefh_g, gd.dzi_g, dxi, dyi,
-            gd.icells, gd.ijcells,
-            gd.istart,  gd.jstart, gd.kstart,
-            gd.iend,    gd.jend,   gd.kend);
+    // BvS: test test..
+    advec_4s_g<TF><<<gridGPU, blockGPU>>>(
+        fields.st.at("thl")->fld_g, fields.st.at("qt")->fld_g, fields.st.at("qr")->fld_g, fields.st.at("nr")->fld_g,
+        fields.sp.at("thl")->fld_g, fields.sp.at("qt")->fld_g, fields.sp.at("qr")->fld_g, fields.sp.at("nr")->fld_g,
+        fields.mp.at("u")->fld_g, fields.mp.at("v")->fld_g, fields.mp.at("w")->fld_g,
+        fields.rhoref_g, fields.rhorefh_g, gd.dzi_g, dxi, dyi,
+        gd.icells, gd.ijcells,
+        gd.istart,  gd.jstart, gd.kstart,
+        gd.iend,    gd.jend,   gd.kend);
+
+    //for (auto& it : fields.st)
+    //    advec_s_g<TF><<<gridGPU, blockGPU>>>(
+    //        it.second->fld_g, fields.sp.at(it.first)->fld_g,
+    //        fields.mp.at("u")->fld_g, fields.mp.at("v")->fld_g, fields.mp.at("w")->fld_g,
+    //        fields.rhoref_g, fields.rhorefh_g, gd.dzi_g, dxi, dyi,
+    //        gd.icells, gd.ijcells,
+    //        gd.istart,  gd.jstart, gd.kstart,
+    //        gd.iend,    gd.jend,   gd.kend);
     cuda_check_error();
 }
 #endif
