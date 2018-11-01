@@ -207,76 +207,6 @@ namespace
         }
     }
 
-    template<typename TF> //EW: enforce B.C. to be from a mesoscale model, input format is pending
-    void enforce_BC_from_mesoscale_model(
-    		TF* const restrict data, const int fixed_value,
-            const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
-            const int icells, const int jcells, const int kcells, const int igc, const int jgc, const int jtot,
-			Edge edge)
-    {
-        const int jj = icells;
-        const int kk = icells*jcells;
-        if (edge == Edge::East_west_edge || edge == Edge::Both_edges)
-        {
-            // first, east west boundaries
-            for (int k=0; k<kcells; ++k)
-                for (int j=0; j<jcells; ++j)
-                    #pragma ivdep
-                    for (int i=0; i<igc+1; ++i)
-                    {
-                        const int ijk0 = i          + j*jj + k*kk;
-                        data[ijk0] = fixed_value;
-                    }
-
-            for (int k=0; k<kcells; ++k)
-                for (int j=0; j<jcells; ++j)
-                    #pragma ivdep
-                    for (int i=0; i<igc+1; ++i)
-                    {
-                        const int ijk0 = i+iend   + j*jj + k*kk;
-                        data[ijk0] = fixed_value;
-                    }
-        }
-        if (edge == Edge::North_south_edge || edge == Edge::Both_edges)
-        {
-            // if the run is 3D, apply the BCs
-            if (jtot > 1)
-            {
-                // second, send and receive the ghost cells in the north-south direction
-                for (int k=0; k<kcells; ++k)
-                    for (int j=0; j<jgc+1; ++j)
-                        #pragma ivdep
-                        for (int i=0; i<icells; ++i)
-                        {
-                            const int ijk0 = i + j                 *jj + k*kk;
-                            data[ijk0] = fixed_value;
-                        }
-
-                for (int k=0; k<kcells; ++k)
-                    for (int j=0; j<jgc+1; ++j)
-                        #pragma ivdep
-                        for (int i=0; i<icells; ++i)
-                        {
-                            const int ijk0 = i + (j+jend  )*jj + k*kk;
-                            data[ijk0] = fixed_value;
-                        }
-            }
-            // in case of 2D, fill all the ghost cells with the current value
-            else
-            {
-                for (int k=kstart; k<kend; ++k)
-                    for (int j=0; j<jgc+1; ++j)
-                        #pragma ivdep
-                        for (int i=0; i<icells; ++i)
-                        {
-                            const int ijknorth = i + j*jj           + k*kk;
-                            const int ijksouth = i + (jend+j)*jj + k*kk;
-                            data[ijknorth] = fixed_value;
-                            data[ijksouth] = fixed_value;
-                        }
-            }
-        }
-    }
     //ToDo: initialize 1d, 2d, 3d arrays properly
     //sunray for tau and swn
     //zenith for mu
@@ -371,7 +301,6 @@ Force<TF>::Force(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsin, Input
     std::string swls_in     = inputin.get_item<std::string>("force", "swls", "", "0");
     std::string swwls_in    = inputin.get_item<std::string>("force", "swwls", "", "0");
     std::string swnudge_in  = inputin.get_item<std::string>("force", "swnudge", "", "0");
-    std::string mesoscalebc_in = inputin.get_item<std::string>("force", "mesoscalebc", "", "0");
 
     // Set the internal switches and read other required input
 
@@ -450,17 +379,6 @@ Force<TF>::Force(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsin, Input
     else
     {
         throw std::runtime_error("Invalid option for \"swnduge\"");
-    }
-    // Enforce BC from some mesoscale model
-    if (mesoscalebc_in == "0")
-    	mesoscalebc = Mesoscale_BC_type::disabled;
-    else if (mesoscalebc_in == "1")
-    {
-    	mesoscalebc = Mesoscale_BC_type::enabled;
-    }
-    else
-    {
-    	throw std::runtime_error("Invalid option for \"mesoscalebc\"");
     }
 
 }
@@ -615,13 +533,6 @@ void Force<TF>::exec(double dt)
                     gd.icells, gd.ijcells);
     }
 
-    if (mesoscalebc == Mesoscale_BC_type::enabled)
-    {   //hard-coding a fixed u value at the BC for testing purposes
-    	enforce_BC_from_mesoscale_model(fields.sp.at("th")->fld.data(), 285,
-                gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-				gd.icells, gd.jcells, gd.kcells, gd.igc, gd.jgc, gd.jtot,
-				Edge::Both_edges);
-    }
 }
 #endif
 
