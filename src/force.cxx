@@ -211,11 +211,11 @@ namespace
     //sunray for tau and swn
     //zenith for mu
     template<typename TF> //EW: simplified radiative parameterization for LW and SW fluxes for DYCOMS
-    void gcss_rad(TF* const restrict st, const TF* const restrict s,
+    void gcss_rad(TF* const restrict lwp, TF* const restrict flx, TF* const restrict rhoref, const TF* const restrict s,
             const TF* const restrict wls, const TF* const dzi,
             const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
-            const int icells, const int ijcells){
-    	
+            const int icells, const int ijcells)
+    {
         const int jj = icells;
         const int kk = ijcells;
         const TF xka = 85.;
@@ -228,68 +228,61 @@ namespace
         TF tauc; //single or double precision??
         TF fact;
         int ki; //PBLH index
-        auto lwp = fields.get_tmp(); //how do I set lwp = 0?
-        auto flx = fields.get_tmp();
-        auto tau = fields.get_tmp(); //this should just be defined as a vector?
+        std::vector<TF> tau;
+        tau.resize(kend-kstart);
         const TF mu = 0.05;//zenith(32.5,time); //zenith
-        for (int j=jstart; j<jend; ++j){
-            for (int i=istart; i<iend; ++i){
+        for (int j=jstart; j<jend; ++j)
+        {
+            for (int i=istart; i<iend; ++i)
+            {
                 ki = kend; //set to top of domain
                 for (int k=kstart; k<kend; ++k)
                 {
                     const int ij   = i + j*jj;
                     const int ijk  = i + j*jj + k*kk;
                     const int km1 = std::max(1,k-1);
-                    lwp[ij] = lwp[ij]+std::max(0.,ql[ijk]*fields.rhoref[k]*(dzi[k]-dzi[km1]));
-                    flx[ijk] = fr1*std::exp(-1.*xka*lwp[ij]);
-                    if ((ql[ijk]>0.01E-3)&&(qt[ijk]>=0.008)) ki = k; //this is the PBLH index
+                    lwp[ij] = lwp[ij] + std::max(0.,ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]));
+                    flx[ijk] = fr1 * std::exp(-1.0 * xka * lwp[ij]);
+                    if ((ql[ijk]>0.01E-3) && (qt[ijk]>=0.008)) ki = k; //this is the PBLH index
                 }
 				
-                if (mu>0.035){
+                if (mu>0.035)
+                {
                     tauc = 0.0;
-                    for (k=kstart;k<kend;++k){
+                    for (k=kstart;k<kend;++k)
+                    {
                         const int ij   = i + j*jj;
                         const int ijk  = i + j*jj + k*kk;
                         const int km1 = std::max(1,k-1);
                         tau[k] = 0.0;
-                        if (ql[ijk]>1.E-5){
-                            tau[k] = std::max(0.,1.5*ql[ijk]*fields.rhoref[k]*(dzi[k]-dzi[km1])/reff/rho_l);
+                        if (ql[ijk]>1.E-5)
+                        {
+                            tau[k] = std::max(0.,1.5 * ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]) / reff / rho_l);
                             tauc = tauc + tau[k];
                         }
                     }
                     //sunray
-                    swn = 1.0; //SW
-                }
-                fact = div*cp*fields.rhoref[ki];
-                flx[i+j*jj+kstart*kk] = flx[i+j*jj+kstart*kk]+fr0*std::exp(-1.*xka*lwp[ij]);
-                for (int k=kstart+1;k<kend;++k){
+                    // swn = 1.0; //no SW for now
+                } //end if
+                fact = div * cp * rhoref[ki];
+                flx[i + j*jj + kstart*kk] = flx[i + j*jj + kstart*kk] + fr0 * std::exp(-1.0 * xka *lwp[ij]);
+                for (int k=kstart+1;k<kend;++k)
+                {
                     const int ij   = i + j*jj;
                     const int ijk  = i + j*jj + k*kk;
                     const int km1 = std::max(kstart+1,k-1);
                     const int ijkm = i + j*jj + km1*kk;
-                    lwp[ij] = lwp[ij]-std::max(0.,ql[ijk]*fields.rhoref[k]*(dzi[k]-dzi[km1]));
-                    flx[ijk] = flx[ijk]+fr0*std::exp(-1.*xka*lwp[ij]);
-                    if ((k>ki)&&(ki>1)&&(fact>0.)){ //above PBLH
-                        flx[ijk] = flx[ijk] + fact*(0.25*std::pow(z[k]-z[km],1.333)+z[km]*std::pow(z[k]-z[ki],0.33333))
-                    }
-                    tt[ijk] = tt[ijk]-(flx[ijk]-flx[ijkm])*dzh[k]/(fields.rhoref[k]*cp);
-                    tt[ijk] = tt[ijk]+(swn[ijk]-swn[ijkm])*dzh[k]/(fields.rhoref[k]*cp);
+                    lwp[ij] = lwp[ij] - std::max(0.,ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]));
+                    flx[ijk] = flx[ijk] + fr0 * std::exp(-1.0 * xka * lwp[ij]);
+                    if ((k>ki) && (ki>1) && (fact>0.))
+                    { //above PBLH
+                        flx[ijk] = flx[ijk] + fact * (0.25 * std::pow(z[k]-z[km],1.333) + z[km] * std::pow(z[k]-z[ki],0.33333));
+                    } //every hard coded values need to be in TF, so that it's not casting double to single 
+                    tt[ijk] = tt[ijk] - (flx[ijk] - flx[ijkm]) * dzh[k] / (rhoref[k] * cp);
+                    // tt[ijk] = tt[ijk]+(swn[ijk]-swn[ijkm])*dzh[k]/(fields.rhoref[k]*cp); //no SW for now
                 }
-                //subsidence part
-                if (div!=0.){
-                    for (int k=kstart+1;k<kend-2,++k){
-                        const int ijk  = i + j*jj + k*kk;
-                        const int kp1 = k+1;
-                        const int ijkp1 = i + j*jj + kp1*kk;
-                        tt[ijk] = tt[ijk] + div*z[k]*(tl[ijkp1]-tl[ijk])*dzi[k];
-                        qtt[ijk] = qtt[ijk] + div*z[k]*(qt[ijkp1]-qt[ijk])*dzi[k];
-                    }
-                }
-				
             } // end of i
         } // end of j
-        fields.release_tmp(lwp);
-        fields.release_tmp(flux);
     } // end of gcss_rad
 }
 
@@ -532,7 +525,15 @@ void Force<TF>::exec(double dt)
                     gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
                     gd.icells, gd.ijcells);
     }
+    //get temp fileds here to be more efficient, also release the fields here
 
+    if (gcssrad == Gcss_rad_type::enabled)
+    {
+        auto lwp = fields.get_tmp();
+        auto flx = fields.get_tmp();
+        fields.release_tmp(lwp);
+        fields.release_tmp(flx);
+    }
 }
 #endif
 
