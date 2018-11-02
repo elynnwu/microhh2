@@ -212,7 +212,8 @@ namespace
     //sunray for tau and swn
     //zenith for mu
     template<typename TF> //EW: simplified radiative parameterization for LW and SW fluxes for DYCOMS
-    void calc_gcss_rad(TF* const restrict tt, const TF* const restrict ql, const TF* const restrict qt,
+    void calc_gcss_rad(
+            TF* const restrict tt, const TF* const restrict ql, const TF* const restrict qt,
             TF* const restrict lwp, TF* const restrict flx, const TF* const restrict rhoref, 
             const TF* const z, const TF* const dzi,
             const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
@@ -286,7 +287,7 @@ namespace
                 }
             } // end of i
         } // end of j
-    } // end of gcss_rad
+    } // end of calc_gcss_rad
 }
 
 template<typename TF>
