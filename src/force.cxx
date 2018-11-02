@@ -251,7 +251,7 @@ namespace
                 if (mu>0.035)
                 {
                     tauc = TF(0.0);
-                    for (k=kstart;k<kend;++k)
+                    for (int k=kstart;k<kend;++k)
                     {
                         const int ij   = i + j*jj;
                         const int ijk  = i + j*jj + k*kk;
@@ -267,7 +267,8 @@ namespace
                     // swn = 1.0; //no SW for now
                 } //end if
                 fact = div * cp * rhoref[ki];
-                flx[i + j*jj + kstart*kk] = flx[i + j*jj + kstart*kk] + fr0 * std::exp(-1.0 * xka *lwp[ij]);
+                const int ij   = i + j*jj;
+                flx[ij + kstart*kk] = flx[ij + kstart*kk] + fr0 * std::exp(-1.0 * xka *lwp[ij]);
                 for (int k=kstart+1;k<kend;++k)
                 {
                     const int ij   = i + j*jj;
@@ -278,9 +279,9 @@ namespace
                     flx[ijk] = flx[ijk] + fr0 * std::exp(-1.0 * xka * lwp[ij]);
                     if ((k>ki) && (ki>1) && (fact>0.))
                     { //above PBLH
-                        flx[ijk] = flx[ijk] + fact * ( TF(0.25) * std::pow(z[k]-z[km],TF(1.333)) + z[km] * std::pow(z[k]-z[ki],TF(0.33333)) );
+                        flx[ijk] = flx[ijk] + fact * ( TF(0.25) * std::pow(z[k]-z[ki],TF(1.333)) + z[ki] * std::pow(z[k]-z[ki],TF(0.33333)) );
                     } //every hard coded values need to be in TF, so that it's not casting double to single 
-                    tt[ijk] = tt[ijk] - (flx[ijk] - flx[ijkm]) * dzh[k] / (rhoref[k] * cp);
+                    tt[ijk] = tt[ijk] - (flx[ijk] - flx[ijkm]) * dzi[k] / (rhoref[k] * cp);
                     // tt[ijk] = tt[ijk]+(swn[ijk]-swn[ijkm])*dzh[k]/(fields.rhoref[k]*cp); //no SW for now
                 }
             } // end of i
@@ -547,7 +548,8 @@ void Force<TF>::exec(double dt)
         auto lwp = fields.get_tmp();
         auto flx = fields.get_tmp();
         //check where ql is saved - don't think it's in fields
-        calc_gcss_rad<TF>(fields.st.at("thl")->fld.data(), fields.sp.at("ql")->fld.data(), fields.sp.at("qt")->fld.data(),
+        calc_gcss_rad<TF>(
+            fields.st.at("thl")->fld.data(), fields.sp.at("ql")->fld.data(), fields.sp.at("qt")->fld.data(),
             lwp, flx, fields.rhoref.data(), 
             gd.z.data(), gd.dzhi.data(),
             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
