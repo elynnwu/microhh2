@@ -211,8 +211,9 @@ namespace
     //sunray for tau and swn
     //zenith for mu
     template<typename TF> //EW: simplified radiative parameterization for LW and SW fluxes for DYCOMS
-    void gcss_rad(TF* const restrict lwp, TF* const restrict flx, TF* const restrict rhoref, const TF* const restrict s,
-            const TF* const restrict wls, const TF* const dzi,
+    void calc_gcss_rad(TF* const restrict tt, const TF* const restrict ql, const TF* const restrict qt,
+            TF* const restrict lwp, TF* const restrict flx, const TF* const restrict rhoref, 
+            const TF* const z, const TF* const dzi,
             const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
             const int icells, const int ijcells)
     {
@@ -225,11 +226,11 @@ namespace
         const TF reff = 1.E-5;
         const TF cp = 1005; //can read this from constant.h
         const TF div = 3.75E-6; //fix divergence for now
-        TF tauc; //single or double precision??
+        TF tauc;
         TF fact;
         int ki; //PBLH index
         std::vector<TF> tau;
-        tau.resize(kend-kstart);
+        tau.resize(kend-kstart+1);
         const TF mu = 0.05;//zenith(32.5,time); //zenith
         for (int j=jstart; j<jend; ++j)
         {
@@ -243,18 +244,18 @@ namespace
                     const int km1 = std::max(1,k-1);
                     lwp[ij] = lwp[ij] + std::max(0.,ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]));
                     flx[ijk] = fr1 * std::exp(-1.0 * xka * lwp[ij]);
-                    if ((ql[ijk]>0.01E-3) && (qt[ijk]>=0.008)) ki = k; //this is the PBLH index
+                    if ( (ql[ijk] > TF(0.01E-3) ) && ( qt[ijk] >= TF(0.008) ) ) ki = k; //this is the PBLH index
                 }
 				
                 if (mu>0.035)
                 {
-                    tauc = 0.0;
+                    tauc = TF(0.0);
                     for (k=kstart;k<kend;++k)
                     {
                         const int ij   = i + j*jj;
                         const int ijk  = i + j*jj + k*kk;
                         const int km1 = std::max(1,k-1);
-                        tau[k] = 0.0;
+                        tau[k] = TF(0.0);
                         if (ql[ijk]>1.E-5)
                         {
                             tau[k] = std::max(0.,1.5 * ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]) / reff / rho_l);
@@ -276,7 +277,7 @@ namespace
                     flx[ijk] = flx[ijk] + fr0 * std::exp(-1.0 * xka * lwp[ij]);
                     if ((k>ki) && (ki>1) && (fact>0.))
                     { //above PBLH
-                        flx[ijk] = flx[ijk] + fact * (0.25 * std::pow(z[k]-z[km],1.333) + z[km] * std::pow(z[k]-z[ki],0.33333));
+                        flx[ijk] = flx[ijk] + fact * ( TF(0.25) * std::pow(z[k]-z[km],TF(1.333)) + z[km] * std::pow(z[k]-z[ki],TF(0.33333)) );
                     } //every hard coded values need to be in TF, so that it's not casting double to single 
                     tt[ijk] = tt[ijk] - (flx[ijk] - flx[ijkm]) * dzh[k] / (rhoref[k] * cp);
                     // tt[ijk] = tt[ijk]+(swn[ijk]-swn[ijkm])*dzh[k]/(fields.rhoref[k]*cp); //no SW for now
@@ -294,6 +295,7 @@ Force<TF>::Force(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsin, Input
     std::string swls_in     = inputin.get_item<std::string>("force", "swls", "", "0");
     std::string swwls_in    = inputin.get_item<std::string>("force", "swwls", "", "0");
     std::string swnudge_in  = inputin.get_item<std::string>("force", "swnudge", "", "0");
+    std::string gcssrad_in  = inputin.get_item<std::string>("force", "gcssrad", "", "0");
 
     // Set the internal switches and read other required input
 
@@ -372,6 +374,18 @@ Force<TF>::Force(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsin, Input
     else
     {
         throw std::runtime_error("Invalid option for \"swnduge\"");
+    }
+
+    //gcss rad
+    if (gcssrad_in == "0")
+        gcssrad = Gcss_rad_type::disabled;
+    else if (gcssrad_in == "1")
+    {
+        gcssrad = Gcss_rad_type::enabled;
+    }
+    else
+    {
+        throw std::runtime_error("Invalide option for \"gcssrad\"");
     }
 
 }
@@ -531,6 +545,7 @@ void Force<TF>::exec(double dt)
     {
         auto lwp = fields.get_tmp();
         auto flx = fields.get_tmp();
+        calc_gcss_rad<TF>();
         fields.release_tmp(lwp);
         fields.release_tmp(flx);
     }
