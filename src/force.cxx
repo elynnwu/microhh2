@@ -545,7 +545,12 @@ void Force<TF>::exec(double dt)
     {
         auto lwp = fields.get_tmp();
         auto flx = fields.get_tmp();
-        calc_gcss_rad<TF>();
+        //check where ql is saved - don't think it's in fields
+        calc_gcss_rad<TF>(fields.st.at("thl")->fld.data(), fields.sp.at("ql")->fld.data(), fields.sp.at("qt")->fld.data(),
+            lwp, flx, fields.rhoref.data(), 
+            gd.z.data(), gd.dzhi.data(),
+            gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
+            gd.icells, gd.ijcells);
         fields.release_tmp(lwp);
         fields.release_tmp(flx);
     }
