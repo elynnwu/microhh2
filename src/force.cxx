@@ -21,6 +21,7 @@
  */
 
 #include <cstdio>
+#include <cmath>
 #include <math.h>
 #include "master.h"
 #include "grid.h"
