@@ -486,7 +486,7 @@ void Force<TF>::create(Input& inputin, Data_block& profs)
 
 #ifndef USECUDA
 template <typename TF>
-void Force<TF>::exec(double dt)
+void Force<TF>::exec(double dt, Thermo<TF>& thermo)
 {
     auto& gd = grid.get_grid_data();
 
@@ -548,9 +548,11 @@ void Force<TF>::exec(double dt)
     {
         auto lwp = fields.get_tmp();
         auto flx = fields.get_tmp();
+        auto ql = fields.get_tmp();
+        thermo.get_thermo_fields(*ql,"ql",false,false);
         //check where ql is saved - don't think it's in fields
         calc_gcss_rad<TF>(
-            fields.st.at("thl")->fld.data(), fields.sp.at("ql")->fld.data(), fields.sp.at("qt")->fld.data(),
+            fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
             lwp->fld.data(), flx->fld.data(), fields.rhoref.data(), 
             gd.z.data(), gd.dzhi.data(),
             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
