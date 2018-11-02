@@ -548,9 +548,9 @@ void Force<TF>::exec(double dt, Thermo<TF>& thermo)
     {
         auto lwp = fields.get_tmp();
         auto flx = fields.get_tmp();
-        auto ql = fields.get_tmp();
-        thermo.get_thermo_fields(*ql,"ql",false,false);
-        //check where ql is saved - don't think it's in fields
+        auto ql  = fields.get_tmp();
+        thermo.get_thermo_fields(*ql,"ql",false,false); //where should ql be from?
+        
         calc_gcss_rad<TF>(
             fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
             lwp->fld.data(), flx->fld.data(), fields.rhoref.data(), 
@@ -559,6 +559,7 @@ void Force<TF>::exec(double dt, Thermo<TF>& thermo)
             gd.icells, gd.ijcells);
         fields.release_tmp(lwp);
         fields.release_tmp(flx);
+        fields.release_tmp(ql);
     }
 }
 #endif
