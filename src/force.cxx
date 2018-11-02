@@ -34,6 +34,7 @@
 #include "timeloop.h"
 #include "boundary.h"
 #include "data_block.h"
+#include "thermo.h"
 
 using namespace Finite_difference::O2;
 
@@ -549,7 +550,7 @@ void Force<TF>::exec(double dt, Thermo<TF>& thermo)
         auto lwp = fields.get_tmp();
         auto flx = fields.get_tmp();
         auto ql  = fields.get_tmp();
-        thermo.get_thermo_fields(*ql,"ql",false,false); //where should ql be from?
+        thermo.get_thermo_field(*ql,"ql",false,false);
         
         calc_gcss_rad<TF>(
             fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
