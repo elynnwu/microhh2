@@ -244,7 +244,7 @@ namespace
                     const int ij   = i + j*jj;
                     const int ijk  = i + j*jj + k*kk;
                     const int km1 = std::max(1,k-1);
-                    lwp[ij] = lwp[ij] + std::max(0.,ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]));
+                    lwp[ij] = lwp[ij] + std::max( TF(0.0) , ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]));
                     flx[ijk] = fr1 * std::exp(-1.0 * xka * lwp[ij]);
                     if ( (ql[ijk] > TF(0.01E-3) ) && ( qt[ijk] >= TF(0.008) ) ) ki = k; //this is the PBLH index
                 }
@@ -260,7 +260,7 @@ namespace
                         tau[k] = TF(0.0);
                         if (ql[ijk]>1.E-5)
                         {
-                            tau[k] = std::max(0.,1.5 * ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]) / reff / rho_l);
+                            tau[k] = std::max(TF(0.0) , TF(1.5) * ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]) / reff / rho_l);
                             tauc = tauc + tau[k];
                         }
                     }
@@ -276,7 +276,7 @@ namespace
                     const int ijk  = i + j*jj + k*kk;
                     const int km1 = std::max(kstart+1,k-1);
                     const int ijkm = i + j*jj + km1*kk;
-                    lwp[ij] = lwp[ij] - std::max(0.,ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]));
+                    lwp[ij] = lwp[ij] - std::max( TF(0.0) , ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]));
                     flx[ijk] = flx[ijk] + fr0 * std::exp(-1.0 * xka * lwp[ij]);
                     if ((k>ki) && (ki>1) && (fact>0.))
                     { //above PBLH
@@ -551,7 +551,7 @@ void Force<TF>::exec(double dt)
         //check where ql is saved - don't think it's in fields
         calc_gcss_rad<TF>(
             fields.st.at("thl")->fld.data(), fields.sp.at("ql")->fld.data(), fields.sp.at("qt")->fld.data(),
-            lwp, flx, fields.rhoref.data(), 
+            lwp->fld.data(), flx->fld.data(), fields.rhoref.data(), 
             gd.z.data(), gd.dzhi.data(),
             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
             gd.icells, gd.ijcells);
