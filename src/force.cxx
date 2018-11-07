@@ -19,7 +19,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MicroHH.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+#include <iostream>
 #include <cstdio>
 #include <cmath>
 #include <math.h>
@@ -285,6 +285,7 @@ namespace
                     } //every hard coded values need to be in TF, so that it's not casting double to single 
                     tt[ijk] = tt[ijk] - (flx[ijk] - flx[ijkm]) * dzi[k] / (rhoref[k] * cp);
                     // tt[ijk] = tt[ijk]+(swn[ijk]-swn[ijkm])*dzh[k]/(fields.rhoref[k]*cp); //no SW for now
+                    if ((i==10)&(j==10)) std::cout << "k = " << k << ", flx = " << flx[ijk];
                 }
             } // end of i
         } // end of j
