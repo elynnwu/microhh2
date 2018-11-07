@@ -218,7 +218,7 @@ namespace
             TF* const restrict lwp, TF* const restrict flx, const TF* const restrict rhoref, 
             const TF* const z, const TF* const dzi,
             const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
-            const int icells, const int ijcells)
+            const int icells, const int ijcells, Master& master)
     {
         const int jj = icells;
         const int kk = ijcells;
@@ -239,17 +239,22 @@ namespace
         {
             for (int i=istart; i<iend; ++i)
             {
+                lwp[i+j*jj] = TF(0.0);
                 ki = kend; //set to top of domain
                 for (int k=kstart; k<kend; ++k)
                 {
                     const int ij   = i + j*jj;
                     const int ijk  = i + j*jj + k*kk;
                     const int km1 = std::max(1,k-1);
-                    lwp[ij] = lwp[ij] + std::max( TF(0.0) , ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]));
-                    flx[ijk] = fr1 * std::exp(-1.0 * xka * lwp[ij]);
+                    lwp[ij] = lwp[ij] + std::max( TF(0.0) , ql[ijk] * rhoref[k] * (z[k]-z[km1]));
+                    flx[ijk] = fr1 * std::exp(TF(-1.0) * xka * lwp[ij]);
                     if ( (ql[ijk] > TF(0.01E-3) ) && ( qt[ijk] >= TF(0.008) ) ) ki = k; //this is the PBLH index
                 }
-				
+			    // if ((i==15)&&(j==10))
+       //          {
+       //              master.print_message("lwp = %f\n", lwp[i + j*jj]);
+       //              master.print_message("ki = %f\n", z[ki]);
+       //          }
                 if (mu>0.035)
                 {
                     tauc = TF(0.0);
@@ -261,23 +266,23 @@ namespace
                         tau[k] = TF(0.0);
                         if (ql[ijk]>1.E-5)
                         {
-                            tau[k] = std::max(TF(0.0) , TF(1.5) * ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]) / reff / rho_l);
+                            tau[k] = std::max(TF(0.0) , TF(1.5) * ql[ijk] * rhoref[k] * (z[k]-z[km1]) / reff / rho_l);
                             tauc = tauc + tau[k];
                         }
                     }
                     //sunray
                     // swn = 1.0; //no SW for now
-                } //end if
+                } //end if mu
                 fact = div * cp * rhoref[ki];
                 const int ij   = i + j*jj;
-                flx[ij + kstart*kk] = flx[ij + kstart*kk] + fr0 * std::exp(-1.0 * xka *lwp[ij]);
+                flx[ij + kstart*kk] = flx[ij + kstart*kk] + fr0 * std::exp(TF(-1.0) * xka *lwp[ij]);
                 for (int k=kstart+1;k<kend;++k)
                 {
                     const int ij   = i + j*jj;
                     const int ijk  = i + j*jj + k*kk;
                     const int km1 = std::max(kstart+1,k-1);
                     const int ijkm = i + j*jj + km1*kk;
-                    lwp[ij] = lwp[ij] - std::max( TF(0.0) , ql[ijk] * rhoref[k] * (dzi[k]-dzi[km1]));
+                    lwp[ij] = lwp[ij] - std::max( TF(0.0) , ql[ijk] * rhoref[k] * (z[k]-z[k-1]));
                     flx[ijk] = flx[ijk] + fr0 * std::exp(-1.0 * xka * lwp[ij]);
                     if ((k>ki) && (ki>1) && (fact>0.))
                     { //above PBLH
@@ -285,7 +290,12 @@ namespace
                     } //every hard coded values need to be in TF, so that it's not casting double to single 
                     tt[ijk] = tt[ijk] - (flx[ijk] - flx[ijkm]) * dzi[k] / (rhoref[k] * cp);
                     // tt[ijk] = tt[ijk]+(swn[ijk]-swn[ijkm])*dzh[k]/(fields.rhoref[k]*cp); //no SW for now
-                    if ((i==10)&(j==10)) std::cout << "k = " << k << ", flx = " << flx[ijk];
+
+                    if ((i==15)&&(j==10))
+                    {
+                        master.print_message("k = %i", k);
+                        master.print_message("flx = %f\n", flx[ijk]);
+                    }
                 }
             } // end of i
         } // end of j
@@ -558,7 +568,7 @@ void Force<TF>::exec(double dt, Thermo<TF>& thermo)
             lwp->fld.data(), flx->fld.data(), fields.rhoref.data(), 
             gd.z.data(), gd.dzhi.data(),
             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-            gd.icells, gd.ijcells);
+            gd.icells, gd.ijcells, master);
         fields.release_tmp(lwp);
         fields.release_tmp(flx);
         fields.release_tmp(ql);
