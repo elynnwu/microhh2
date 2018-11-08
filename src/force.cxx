@@ -3,7 +3,8 @@
  * Copyright (c) 2011-2018 Chiel van Heerwaarden
  * Copyright (c) 2011-2018 Thijs Heus
  * Copyright (c) 2014-2018 Bart van Stratum
- *
+ * Copyright (c) 2018 Elynn Wu
+ * Copyright (c) 2018 Monica Zamora Zapata
  * This file is part of MicroHH
  *
  * MicroHH is free software: you can redistribute it and/or modify
@@ -218,7 +219,7 @@ namespace
             TF* const restrict lwp, TF* const restrict flx, const TF* const restrict rhoref, 
             const TF* const z, const TF* const dzi,
             const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
-            const int icells, const int ijcells, Master& master)
+            const int icells, const int ijcells, Master& master, const double time)
     {
         const int jj = icells;
         const int kk = ijcells;
@@ -239,7 +240,7 @@ namespace
         {
             for (int i=istart; i<iend; ++i)
             {
-                lwp[i+j*jj] = TF(0.0);
+                lwp[i+j*jj] = TF(0.0); //make sure to initialize lwp to 0
                 ki = kend; //set to top of domain
                 for (int k=kstart; k<kend; ++k)
                 {
@@ -291,9 +292,10 @@ namespace
                     tt[ijk] = tt[ijk] - (flx[ijk] - flx[ijkm]) * dzi[k] / (rhoref[k] * cp);
                     // tt[ijk] = tt[ijk]+(swn[ijk]-swn[ijkm])*dzh[k]/(fields.rhoref[k]*cp); //no SW for now
 
-                    if ((i==15)&&(j==10))
+                    if ((i==15)&&(j==10)&&(std::fmod(time,double(900.))<double(5.)))
                     {
-                        master.print_message("k = %i", k);
+                        master.print_message("t = %f ", time);
+                        master.print_message("k = %f ", z[k]);
                         master.print_message("flx = %f\n", flx[ijk]);
                     }
                 }
@@ -498,7 +500,7 @@ void Force<TF>::create(Input& inputin, Data_block& profs)
 
 #ifndef USECUDA
 template <typename TF>
-void Force<TF>::exec(double dt, Thermo<TF>& thermo)
+void Force<TF>::exec(double dt, Thermo<TF>& thermo, double time)
 {
     auto& gd = grid.get_grid_data();
 
@@ -562,13 +564,14 @@ void Force<TF>::exec(double dt, Thermo<TF>& thermo)
         auto flx = fields.get_tmp();
         auto ql  = fields.get_tmp();
         thermo.get_thermo_field(*ql,"ql",false,false);
-        
+        //for time, following enforce_fixed_flux notation, keeping dt as TF const dt
+        //is it better to pass it as double? to be consistent with the header file
         calc_gcss_rad<TF>(
             fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
             lwp->fld.data(), flx->fld.data(), fields.rhoref.data(), 
             gd.z.data(), gd.dzhi.data(),
             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-            gd.icells, gd.ijcells, master);
+            gd.icells, gd.ijcells, master, time);
         fields.release_tmp(lwp);
         fields.release_tmp(flx);
         fields.release_tmp(ql);
