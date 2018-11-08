@@ -34,7 +34,7 @@ for k in range(kmax):
     qt[k] = 1e-3*9.0
   else:
     qt[k] = 1.e-3*1.5
-  wls[k] = 3.75E-6*z[k]
+  wls[k] = -3.75E-6*z[k]
 
 
   # u-wind component
