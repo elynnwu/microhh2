@@ -3,7 +3,8 @@
  * Copyright (c) 2011-2018 Chiel van Heerwaarden
  * Copyright (c) 2011-2018 Thijs Heus
  * Copyright (c) 2014-2018 Bart van Stratum
- *
+ * Copyright (c) 2018 Elynn Wu
+ * Copyright (c) 2018 Monica Zamora Zapata
  * This file is part of MicroHH
  *
  * MicroHH is free software: you can redistribute it and/or modify
@@ -59,7 +60,7 @@ class Force
 
         void init();           ///< Initialize the arrays that contain the profiles.
         void create(Input&, Data_block&);   ///< Read the profiles of the forces from the input.
-        void exec(double, Thermo<TF>&);     ///< Add the tendencies belonging to the large-scale processes.
+        void exec(double, Thermo<TF>&, double);     ///< Add the tendencies belonging to the large-scale processes.
 
         void update_time_dependent(Timeloop<TF>&); ///< Update the time dependent parameters.
 
