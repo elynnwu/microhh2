@@ -26,8 +26,7 @@
 #include <vector>
 #include "field3d_operators.h"
 
-enum class Radiation_type {Enabled, Disabled};
-enum class Gcss_rad_type {Enabled, Disabled};
+enum class Radiation_type {Enabled, Disabled, Gcss};
 
 class Master;
 class Input;

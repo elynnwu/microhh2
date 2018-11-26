@@ -324,7 +324,7 @@ void Model<TF>::exec()
                 microphys->exec(*thermo, timeloop->get_sub_time_step());
 
                 // Calculate the radiation fluxes and the related heating rate.
-                radiation->exec(*thermo);
+                radiation->exec(*thermo,timeloop->get_time());
 
                 // Calculate the tendency due to damping in the buffer layer.
                 buffer->exec();
@@ -333,7 +333,7 @@ void Model<TF>::exec()
                 decay->exec(timeloop->get_sub_time_step());
 
                 // Apply the large scale forcings. Keep this one always right before the pressure.
-                force->exec(timeloop->get_sub_time_step(), *thermo, timeloop->get_time()); //adding thermo and time because of gcssrad
+                force->exec(timeloop->get_sub_time_step()); //adding thermo and time because of gcssrad
 
                 // Solve the poisson equation for pressure.
                 boundary->set_ghost_cells_w(Boundary_w_type::Conservation_type);

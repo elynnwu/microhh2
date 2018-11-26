@@ -155,7 +155,7 @@ Radiation<TF>::Radiation(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsi
     else if (swradiation_in == "1")
         swradiation = Radiation_type::Enabled;
     else if (swradiation_in == "2")
-        swradiation = Gcss_rad_type::Enabled;
+        swradiation = Radiation_type::Gcss;
     else
         throw std::runtime_error("Invalid option for \"swradiation\"");
 
@@ -174,6 +174,7 @@ Radiation<TF>::~Radiation()
 template<typename TF>
 void Radiation<TF>::init()
 {
+    auto& gd = grid.get_grid_data();
     if (swradiation == Radiation_type::Disabled)
         return;
     if (swradiation == Radiation_type::Enabled)
@@ -292,10 +293,9 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time)
 {
     if (swradiation == Radiation_type::Disabled)
         return;
+    auto& gd = grid.get_grid_data();
     if (swradiation == Radiation_type::Enabled)
     {
-        auto& gd = grid.get_grid_data();
-
         // For now...
         inflglw = 0;
         iceflglw = 0;
@@ -349,7 +349,7 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time)
     }
 
 
-    if (swradiation == Gcss_rad_type::Enabled)
+    if (swradiation == Radiation_type::Gcss)
     {
         auto lwp = fields.get_tmp();
         auto flx = fields.get_tmp();
