@@ -44,6 +44,10 @@ class Radiation
         void create(Thermo<TF>&);
         void exec(Thermo<TF>&, double);
 
+        void exec_stats(Stats<TF>&);
+        void exec_cross(Cross<TF>&, unsigned long);
+        void exec_dump(Dump<TF>&, unsigned long);
+        void exec_column(Column<TF>&);
     private:
         Master& master;
         Grid<TF>& grid;
@@ -51,6 +55,18 @@ class Radiation
         Field3d_operators<TF> field3d_operators;
 
         Radiation_type swradiation;
+
+        // cross sections
+        std::vector<std::string> crosslist;        ///< List with all crosses from ini file
+        bool swcross_rflx;
+        std::vector<std::string> dumplist;         ///< List with all 3d dumps from the ini file.
+
+        void create_stats(Stats<TF>&);   ///< Initialization of the statistics.
+        void create_column(Column<TF>&); ///< Initialization of the single column output.
+        void create_dump(Dump<TF>&);     ///< Initialization of the single column output.
+        void create_cross(Cross<TF>&);   ///< Initialization of the single column output.
+        std::vector<std::string> available_masks;   // Vector with the masks that fields can provide
+
 
         int ncol;
         int nlay;

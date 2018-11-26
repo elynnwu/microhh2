@@ -367,5 +367,94 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time)
     }
 }
 
+template<typename TF>
+void Radiation<TF>::create_stats(Stats<TF>& stats)
+{
+    if (stats.get_switch())
+    {
+        stats.add_prof("rflx", "Total radiative flux", "W m-2", "z");
+        //when full radiation is available, add the following:
+        // stats.add_prof("sflxd", "Downward shortwave radiative flux", "W m-2", "z");
+        // stats.add_prof("sflxu", "Upward shortwave radiative flux", "W m-2", "z");
+        // stats.add_prof("lflxd", "Downward longwave radiative flux", "W m-2", "z");
+        // stats.add_prof("lflxu", "Upward longwave radiative flux", "W m-2", "z");
+    }
+}
+
+template<typename TF>
+void Radiation<TF>::create_column(Column<TF>& column)
+{
+    // add the profiles to the columns
+    if (column.get_switch())
+    {
+        column.add_prof("rflx", "Total radiative flux", "W m-2", "z");
+    }
+}
+
+template<typename TF>
+void Radiation<TF>::create_cross(Cross<TF>& cross)
+{
+    if (cross.get_switch())
+    {
+        swcross_rflx = false;
+
+        // Vectors with allowed cross variables for radiative flux
+        std::vector<std::string> allowed_crossvars_rflx = {"rflx"};
+
+        std::vector<std::string> rflxvars  = cross.get_enabled_variables(allowed_crossvars_rflx);
+        if (rflxvars.size() > 0)
+            swcross_rflx  = true;
+        crosslist = bvars;
+    }
+}
+
+template<typename TF>
+void Radiation<TF>::create_dump(Dump<TF>& dump)
+{
+    if (dump.get_switch())
+    {
+        // Get global cross-list from cross.cxx
+        std::vector<std::string> *dumplist_global = dump.get_dumplist();
+
+        // Check if fields in dumplist are retrievable thermo fields
+        std::vector<std::string>::iterator dumpvar=dumplist_global->begin();
+        while (dumpvar != dumplist_global->end())
+        {
+            if (check_field_exists(*dumpvar))
+            {
+                // Remove variable from global list, put in local list
+                dumplist.push_back(*dumpvar);
+                dumplist_global->erase(dumpvar); // erase() returns iterator of next element..
+            }
+            else
+                ++dumpvar;
+        }
+    }
+}
+
+template<typename TF>
+void Radiation<TF>::exec_stats(Stats<TF>& stats)
+{
+
+}
+
+template<typename TF>
+void Radiation<TF>::exec_column(Column<TF>& column)
+{
+
+}
+
+template<typename TF>
+void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime)
+{
+
+}
+
+template<typename TF>
+void Radiation<TF>::exec_dump(Dump<TF>& dump, unsigned long iotime)
+{
+
+}
+
 template class Radiation<double>;
 template class Radiation<float>;
