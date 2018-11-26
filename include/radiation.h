@@ -27,6 +27,7 @@
 #include "field3d_operators.h"
 
 enum class Radiation_type {Enabled, Disabled};
+enum class Gcss_rad_type {Enabled, Disabled};
 
 class Master;
 class Input;
@@ -42,7 +43,7 @@ class Radiation
         ~Radiation();
         void init();
         void create(Thermo<TF>&);
-        void exec(Thermo<TF>&);
+        void exec(Thermo<TF>&, double);
 
     private:
         Master& master;

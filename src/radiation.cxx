@@ -52,6 +52,95 @@ namespace
                 double *duflx_dt,double *duflxc_dt );
     }
     */
+    template<typename TF> //EW: simplified radiative parameterization for LW and SW fluxes for DYCOMS
+    void calc_gcss_rad(
+            TF* const restrict tt, const TF* const restrict ql, const TF* const restrict qt,
+            TF* const restrict lwp, TF* const restrict flx, const TF* const restrict rhoref,
+            const TF* const z, const TF* const dzi,
+            const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
+            const int icells, const int ijcells, Master& master, const double time)
+    {
+        const int jj = icells;
+        const int kk = ijcells;
+        const TF xka = 85.;
+        const TF fr0 = 70.;
+        const TF fr1 = 22.;
+        const TF rho_l = 1000.;
+        const TF reff = 1.E-5;
+        const TF cp = 1005; //can read this from constant.h
+        const TF div = 3.75E-6; //fix divergence for now
+        TF tauc;
+        TF fact;
+        int ki; //PBLH index
+        std::vector<TF> tau;
+        tau.resize(kend); //kcells so that it takes care of the ghost cells
+        const TF mu = 0.05;//zenith(32.5,time); //zenith
+        for (int j=jstart; j<jend; ++j)
+        {
+            for (int i=istart; i<iend; ++i)
+            {
+                lwp[i+j*jj] = TF(0.0); //make sure to initialize lwp to 0
+                ki = kend; //set to top of domain
+                for (int k=kstart; k<kend; ++k)
+                {
+                    const int ij   = i + j*jj;
+                    const int ijk  = i + j*jj + k*kk;
+                    const int km1 = std::max(1,k-1);
+                    lwp[ij] = lwp[ij] + std::max( TF(0.0) , ql[ijk] * rhoref[k] * (z[k]-z[km1]));
+                    flx[ijk] = fr1 * std::exp(TF(-1.0) * xka * lwp[ij]);
+                    if ( (ql[ijk] > TF(0.01E-3) ) && ( qt[ijk] >= TF(0.008) ) ) ki = k; //this is the PBLH index
+                }
+			    // if ((i==15)&&(j==10))
+       //          {
+       //              master.print_message("lwp = %f\n", lwp[i + j*jj]);
+       //              master.print_message("ki = %f\n", z[ki]);
+       //          }
+                if (mu>0.035)
+                {
+                    tauc = TF(0.0);
+                    for (int k=kstart;k<kend;++k)
+                    {
+                        const int ij   = i + j*jj;
+                        const int ijk  = i + j*jj + k*kk;
+                        const int km1 = std::max(1,k-1);
+                        tau[k] = TF(0.0);
+                        if (ql[ijk]>1.E-5)
+                        {
+                            tau[k] = std::max(TF(0.0) , TF(1.5) * ql[ijk] * rhoref[k] * (z[k]-z[km1]) / reff / rho_l);
+                            tauc = tauc + tau[k];
+                        }
+                    }
+                    //sunray
+                    // swn = 1.0; //no SW for now
+                } //end if mu
+                fact = div * cp * rhoref[ki];
+                const int ij   = i + j*jj;
+                flx[ij + kstart*kk] = flx[ij + kstart*kk] + fr0 * std::exp(TF(-1.0) * xka *lwp[ij]);
+                for (int k=kstart+1;k<kend;++k)
+                {
+                    const int ij   = i + j*jj;
+                    const int ijk  = i + j*jj + k*kk;
+                    const int km1 = std::max(kstart+1,k-1);
+                    const int ijkm = i + j*jj + km1*kk;
+                    lwp[ij] = lwp[ij] - std::max( TF(0.0) , ql[ijk] * rhoref[k] * (z[k]-z[k-1]));
+                    flx[ijk] = flx[ijk] + fr0 * std::exp(-1.0 * xka * lwp[ij]);
+                    if ((k>ki) && (ki>1) && (fact>0.))
+                    { //above PBLH
+                        flx[ijk] = flx[ijk] + fact * ( TF(0.25) * std::pow(z[k]-z[ki],TF(1.333)) + z[ki] * std::pow(z[k]-z[ki],TF(0.33333)) );
+                    } //every hard coded values need to be in TF, so that it's not casting double to single
+                    tt[ijk] = tt[ijk] - (flx[ijk] - flx[ijkm]) * dzi[k] / (rhoref[k] * cp);
+                    // tt[ijk] = tt[ijk]+(swn[ijk]-swn[ijkm])*dzh[k]/(fields.rhoref[k]*cp); //no SW for now
+
+                    if ((i==15)&&(j==10)&&(std::fmod(time,double(900.))<double(5.)))
+                    {
+                        master.print_message("t = %f ", time);
+                        master.print_message("k = %f ", z[k]);
+                        master.print_message("flx = %f\n", flx[ijk]);
+                    }
+                }
+            } // end of i
+        } // end of j
+    } // end of calc_gcss_rad
 }
 
 template<typename TF>
@@ -65,6 +154,8 @@ Radiation<TF>::Radiation(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsi
         swradiation = Radiation_type::Disabled;
     else if (swradiation_in == "1")
         swradiation = Radiation_type::Enabled;
+    else if (swradiation_in == "2")
+        swradiation = Gcss_rad_type::Enabled;
     else
         throw std::runtime_error("Invalid option for \"swradiation\"");
 
@@ -85,7 +176,8 @@ void Radiation<TF>::init()
 {
     if (swradiation == Radiation_type::Disabled)
         return;
-
+    if (swradiation == Radiation_type::Enabled)
+    {
     play.resize(ncol*nlay);     // (ncol, nlay)
     plev.resize(ncol*(nlay+1)); // (ncol, nlay+1)
     tlay.resize(ncol*nlay);     // (ncol, nlay)
@@ -123,6 +215,7 @@ void Radiation<TF>::init()
     hrc.resize(ncol*nlay);           // (ncol, nlay)
     duflx_dt.resize(ncol*(nlay+1));  // (ncol, nlay+1)
     duflxc_dt.resize(ncol*(nlay+1)); // (ncol, nlay+1)
+    }
 }
 
 template<typename TF>
@@ -130,7 +223,8 @@ void Radiation<TF>::create(Thermo<TF>& thermo)
 {
     if (swradiation == Radiation_type::Disabled)
         return;
-
+    if (swradiation == Radiation_type::Enabled)
+    {
     std::string block_name = "radiation.prof";
     Data_block data_block(master, block_name);
 
@@ -190,66 +284,87 @@ void Radiation<TF>::create(Thermo<TF>& thermo)
     data_block.get_vector(n2ovmr, "wkl4", nlay, 0, 0);
     data_block.get_vector(ch4vmr, "wkl6", nlay, 0, 0);
     data_block.get_vector(o2vmr, "wkl7", nlay, 0, 0);
+    }
 }
 
 template<typename TF>
-void Radiation<TF>::exec(Thermo<TF>& thermo)
+void Radiation<TF>::exec(Thermo<TF>& thermo, double time)
 {
     if (swradiation == Radiation_type::Disabled)
         return;
+    if (swradiation == Radiation_type::Enabled)
+    {
+        auto& gd = grid.get_grid_data();
 
-    auto& gd = grid.get_grid_data();
+        // For now...
+        inflglw = 0;
+        iceflglw = 0;
+        liqflglw = 0;
 
-    // For now...
-    inflglw = 0;
-    iceflglw = 0;
-    liqflglw = 0;
+        std::fill(emis.begin(), emis.end(), 1.);
 
-    std::fill(emis.begin(), emis.end(), 1.);
+        // Step 1. Get the mean absolute atmospheric temperature.
+        auto T = fields.get_tmp();
+        thermo.get_thermo_field(*T, "T", false, false);
 
-    // Step 1. Get the mean absolute atmospheric temperature.
-    auto T = fields.get_tmp();
-    thermo.get_thermo_field(*T, "T", false, false);
+        // Calculate radiative cooling only for single column.
+        field3d_operators.calc_mean_profile(T->fld_mean.data(), T->fld.data());
 
-    // Calculate radiative cooling only for single column.
-    field3d_operators.calc_mean_profile(T->fld_mean.data(), T->fld.data());
+        thermo.get_thermo_field(*T, "T_h", false, false);
 
-    thermo.get_thermo_field(*T, "T_h", false, false);
+        // Step 2.
 
-    // Step 2.
+        // Get absolute atmospheric and surface temperature.
+        tsfc[0] = 300.;
 
-    // Get absolute atmospheric and surface temperature.
-    tsfc[0] = 300.;
+        /*
+        c_rrtmg_lw(
+                &ncol    ,&nlay    ,&icld    ,&idrv    ,
+                play.data()    ,plev.data()    ,tlay.data()    ,tlev.data()    ,tsfc.data()    ,
+                h2ovmr.data()  ,o3vmr.data()   ,co2vmr.data()  ,ch4vmr.data()  ,n2ovmr.data()  ,o2vmr.data(),
+                cfc11vmr.data(),cfc12vmr.data(),cfc22vmr.data(),ccl4vmr.data() ,emis.data()    ,
+                &inflglw ,&iceflglw,&liqflglw,cldfr.data() ,
+                taucld.data()  ,cicewp.data()  ,cliqwp.data()  ,reice.data()   ,reliq.data() ,
+                tauaer.data()  ,
+                uflx.data()    ,dflx.data()    ,hr.data()      ,uflxc.data()   ,dflxc.data(),  hrc.data(),
+                duflx_dt.data(),duflxc_dt.data());
+                */
 
-    /*
-    c_rrtmg_lw(
-            &ncol    ,&nlay    ,&icld    ,&idrv    ,
-            play.data()    ,plev.data()    ,tlay.data()    ,tlev.data()    ,tsfc.data()    ,
-            h2ovmr.data()  ,o3vmr.data()   ,co2vmr.data()  ,ch4vmr.data()  ,n2ovmr.data()  ,o2vmr.data(),
-            cfc11vmr.data(),cfc12vmr.data(),cfc22vmr.data(),ccl4vmr.data() ,emis.data()    ,
-            &inflglw ,&iceflglw,&liqflglw,cldfr.data() ,
-            taucld.data()  ,cicewp.data()  ,cliqwp.data()  ,reice.data()   ,reliq.data() ,
-            tauaer.data()  ,
-            uflx.data()    ,dflx.data()    ,hr.data()      ,uflxc.data()   ,dflxc.data(),  hrc.data(),
-            duflx_dt.data(),duflxc_dt.data());
-            */
+        fields.release_tmp(T);
 
-    fields.release_tmp(T);
+        std::cout << "Heating rate" << std::endl;
+        for (int i=0; i<nlay; ++i)
+            std::cout << i       << ", "
+                << play[i] << ", "
+                << hr[i] << ", "
+                << std::endl;
 
-    std::cout << "Heating rate" << std::endl;
-    for (int i=0; i<nlay; ++i)
-        std::cout << i       << ", "
-            << play[i] << ", "
-            << hr[i] << ", "
-            << std::endl;
+        std::cout << "Upflux/downflux rate" << std::endl;
+        for (int i=0; i<nlay+1; ++i)
+            std::cout << i       << ", "
+                << plev[i] << ", "
+                << uflx[i] << ", "
+                << dflx[i] << ", "
+                << std::endl;
+    }
 
-    std::cout << "Upflux/downflux rate" << std::endl;
-    for (int i=0; i<nlay+1; ++i)
-        std::cout << i       << ", "
-            << plev[i] << ", "
-            << uflx[i] << ", "
-            << dflx[i] << ", "
-            << std::endl;
+
+    if (swradiation == Gcss_rad_type::Enabled)
+    {
+        auto lwp = fields.get_tmp();
+        auto flx = fields.get_tmp();
+        auto ql  = fields.get_tmp();
+        thermo.get_thermo_field(*ql,"ql",false,false);
+        calc_gcss_rad<TF>(
+            fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
+            lwp->fld.data(), flx->fld.data(), fields.rhoref.data(),
+            gd.z.data(), gd.dzhi.data(),
+            gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
+            gd.icells, gd.ijcells, master, time);
+        fields.release_tmp(lwp);
+        fields.release_tmp(flx);
+        fields.release_tmp(ql);
+    }
 }
 
 template class Radiation<double>;

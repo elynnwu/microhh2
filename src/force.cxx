@@ -11,12 +11,10 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
-
  * MicroHH is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
  * You should have received a copy of the GNU General Public License
  * along with MicroHH.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -35,7 +33,6 @@
 #include "timeloop.h"
 #include "boundary.h"
 #include "data_block.h"
-#include "thermo.h"
 
 using namespace Finite_difference::O2;
 
@@ -209,99 +206,6 @@ namespace
             }
         }
     }
-
-    //ToDo: initialize 1d, 2d, 3d arrays properly
-    //sunray for tau and swn
-    //zenith for mu
-    template<typename TF> //EW: simplified radiative parameterization for LW and SW fluxes for DYCOMS
-    void calc_gcss_rad(
-            TF* const restrict tt, const TF* const restrict ql, const TF* const restrict qt,
-            TF* const restrict lwp, TF* const restrict flx, const TF* const restrict rhoref, 
-            const TF* const z, const TF* const dzi,
-            const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
-            const int icells, const int ijcells, Master& master, const double time)
-    {
-        const int jj = icells;
-        const int kk = ijcells;
-        const TF xka = 85.;
-        const TF fr0 = 70.;
-        const TF fr1 = 22.;
-        const TF rho_l = 1000.;
-        const TF reff = 1.E-5;
-        const TF cp = 1005; //can read this from constant.h
-        const TF div = 3.75E-6; //fix divergence for now
-        TF tauc;
-        TF fact;
-        int ki; //PBLH index
-        std::vector<TF> tau;
-        tau.resize(kend-kstart+1);
-        const TF mu = 0.05;//zenith(32.5,time); //zenith
-        for (int j=jstart; j<jend; ++j)
-        {
-            for (int i=istart; i<iend; ++i)
-            {
-                lwp[i+j*jj] = TF(0.0); //make sure to initialize lwp to 0
-                ki = kend; //set to top of domain
-                for (int k=kstart; k<kend; ++k)
-                {
-                    const int ij   = i + j*jj;
-                    const int ijk  = i + j*jj + k*kk;
-                    const int km1 = std::max(1,k-1);
-                    lwp[ij] = lwp[ij] + std::max( TF(0.0) , ql[ijk] * rhoref[k] * (z[k]-z[km1]));
-                    flx[ijk] = fr1 * std::exp(TF(-1.0) * xka * lwp[ij]);
-                    if ( (ql[ijk] > TF(0.01E-3) ) && ( qt[ijk] >= TF(0.008) ) ) ki = k; //this is the PBLH index
-                }
-			    // if ((i==15)&&(j==10))
-       //          {
-       //              master.print_message("lwp = %f\n", lwp[i + j*jj]);
-       //              master.print_message("ki = %f\n", z[ki]);
-       //          }
-                if (mu>0.035)
-                {
-                    tauc = TF(0.0);
-                    for (int k=kstart;k<kend;++k)
-                    {
-                        const int ij   = i + j*jj;
-                        const int ijk  = i + j*jj + k*kk;
-                        const int km1 = std::max(1,k-1);
-                        tau[k] = TF(0.0);
-                        if (ql[ijk]>1.E-5)
-                        {
-                            tau[k] = std::max(TF(0.0) , TF(1.5) * ql[ijk] * rhoref[k] * (z[k]-z[km1]) / reff / rho_l);
-                            tauc = tauc + tau[k];
-                        }
-                    }
-                    //sunray
-                    // swn = 1.0; //no SW for now
-                } //end if mu
-                fact = div * cp * rhoref[ki];
-                const int ij   = i + j*jj;
-                flx[ij + kstart*kk] = flx[ij + kstart*kk] + fr0 * std::exp(TF(-1.0) * xka *lwp[ij]);
-                for (int k=kstart+1;k<kend;++k)
-                {
-                    const int ij   = i + j*jj;
-                    const int ijk  = i + j*jj + k*kk;
-                    const int km1 = std::max(kstart+1,k-1);
-                    const int ijkm = i + j*jj + km1*kk;
-                    lwp[ij] = lwp[ij] - std::max( TF(0.0) , ql[ijk] * rhoref[k] * (z[k]-z[k-1]));
-                    flx[ijk] = flx[ijk] + fr0 * std::exp(-1.0 * xka * lwp[ij]);
-                    if ((k>ki) && (ki>1) && (fact>0.))
-                    { //above PBLH
-                        flx[ijk] = flx[ijk] + fact * ( TF(0.25) * std::pow(z[k]-z[ki],TF(1.333)) + z[ki] * std::pow(z[k]-z[ki],TF(0.33333)) );
-                    } //every hard coded values need to be in TF, so that it's not casting double to single 
-                    tt[ijk] = tt[ijk] - (flx[ijk] - flx[ijkm]) * dzi[k] / (rhoref[k] * cp);
-                    // tt[ijk] = tt[ijk]+(swn[ijk]-swn[ijkm])*dzh[k]/(fields.rhoref[k]*cp); //no SW for now
-
-                    if ((i==15)&&(j==10)&&(std::fmod(time,double(900.))<double(5.)))
-                    {
-                        master.print_message("t = %f ", time);
-                        master.print_message("k = %f ", z[k]);
-                        master.print_message("flx = %f\n", flx[ijk]);
-                    }
-                }
-            } // end of i
-        } // end of j
-    } // end of calc_gcss_rad
 }
 
 template<typename TF>
@@ -312,7 +216,6 @@ Force<TF>::Force(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsin, Input
     std::string swls_in     = inputin.get_item<std::string>("force", "swls", "", "0");
     std::string swwls_in    = inputin.get_item<std::string>("force", "swwls", "", "0");
     std::string swnudge_in  = inputin.get_item<std::string>("force", "swnudge", "", "0");
-    std::string gcssrad_in  = inputin.get_item<std::string>("force", "gcssrad", "", "0");
 
     // Set the internal switches and read other required input
 
@@ -391,18 +294,6 @@ Force<TF>::Force(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsin, Input
     else
     {
         throw std::runtime_error("Invalid option for \"swnduge\"");
-    }
-
-    //gcss rad
-    if (gcssrad_in == "0")
-        gcssrad = Gcss_rad_type::disabled;
-    else if (gcssrad_in == "1")
-    {
-        gcssrad = Gcss_rad_type::enabled;
-    }
-    else
-    {
-        throw std::runtime_error("Invalide option for \"gcssrad\"");
     }
 
 }
@@ -500,7 +391,7 @@ void Force<TF>::create(Input& inputin, Data_block& profs)
 
 #ifndef USECUDA
 template <typename TF>
-void Force<TF>::exec(double dt, Thermo<TF>& thermo, double time)
+void Force<TF>::exec(double dt)
 {
     auto& gd = grid.get_grid_data();
 
@@ -556,26 +447,7 @@ void Force<TF>::exec(double dt, Thermo<TF>& thermo, double time)
                     gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
                     gd.icells, gd.ijcells);
     }
-    //get temp fileds here to be more efficient, also release the fields here
 
-    if (gcssrad == Gcss_rad_type::enabled)
-    {
-        auto lwp = fields.get_tmp();
-        auto flx = fields.get_tmp();
-        auto ql  = fields.get_tmp();
-        thermo.get_thermo_field(*ql,"ql",false,false);
-        //for time, following enforce_fixed_flux notation, keeping dt as TF const dt
-        //is it better to pass it as double? to be consistent with the header file
-        calc_gcss_rad<TF>(
-            fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
-            lwp->fld.data(), flx->fld.data(), fields.rhoref.data(), 
-            gd.z.data(), gd.dzhi.data(),
-            gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-            gd.icells, gd.ijcells, master, time);
-        fields.release_tmp(lwp);
-        fields.release_tmp(flx);
-        fields.release_tmp(ql);
-    }
 }
 #endif
 
