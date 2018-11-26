@@ -52,23 +52,18 @@ namespace
                 double *duflx_dt,double *duflxc_dt );
     }
     */
-    template<typename TF> //EW: simplified radiative parameterization for LW and SW fluxes for DYCOMS
-    void calc_gcss_rad(
-            TF* const restrict tt, const TF* const restrict ql, const TF* const restrict qt,
-            TF* const restrict lwp, TF* const restrict flx, const TF* const restrict rhoref,
-            const TF* const z, const TF* const dzi,
-            const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
-            const int icells, const int ijcells, Master& master, const double time)
+
+    template<typename TF>
+    void get_gcss_rad_SW(const TF* const restrict ql, const TF* const restrict qt, const TF* const restrict rhoref,
+        const TF* const z, const TF* const dzi,
+        const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
+        const int icells, const int ijcells
+    )
     {
         const int jj = icells;
         const int kk = ijcells;
-        const TF xka = 85.;
-        const TF fr0 = 70.;
-        const TF fr1 = 22.;
         const TF rho_l = 1000.;
         const TF reff = 1.E-5;
-        const TF cp = 1005; //can read this from constant.h
-        const TF div = 3.75E-6; //fix divergence for now
         TF tauc;
         TF fact;
         int ki; //PBLH index
@@ -79,22 +74,6 @@ namespace
         {
             for (int i=istart; i<iend; ++i)
             {
-                lwp[i+j*jj] = TF(0.0); //make sure to initialize lwp to 0
-                ki = kend; //set to top of domain
-                for (int k=kstart; k<kend; ++k)
-                {
-                    const int ij   = i + j*jj;
-                    const int ijk  = i + j*jj + k*kk;
-                    const int km1 = std::max(1,k-1);
-                    lwp[ij] = lwp[ij] + std::max( TF(0.0) , ql[ijk] * rhoref[k] * (z[k]-z[km1]));
-                    flx[ijk] = fr1 * std::exp(TF(-1.0) * xka * lwp[ij]);
-                    if ( (ql[ijk] > TF(0.01E-3) ) && ( qt[ijk] >= TF(0.008) ) ) ki = k; //this is the PBLH index
-                }
-			    // if ((i==15)&&(j==10))
-       //          {
-       //              master.print_message("lwp = %f\n", lwp[i + j*jj]);
-       //              master.print_message("ki = %f\n", z[ki]);
-       //          }
                 if (mu>0.035)
                 {
                     tauc = TF(0.0);
@@ -113,6 +92,41 @@ namespace
                     //sunray
                     // swn = 1.0; //no SW for now
                 } //end if mu
+            }
+        }
+    }
+
+    template<typename TF>
+    void get_gcss_rad_LW(const TF* const restrict ql, const TF* const restrict qt,
+    TF* const restrict lwp, TF* const restrict flx, const TF* const restrict rhoref,
+    const TF* const z, const TF* const dzi,
+    const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
+    const int icells, const int ijcells)
+    {
+        const int jj = icells;
+        const int kk = ijcells;
+        const TF xka = 85.;
+        const TF fr0 = 70.;
+        const TF fr1 = 22.;
+        const TF cp = 1005; //can read this from constant.h
+        const TF div = 3.75E-6; //fix divergence for now
+        int ki; //pblh index
+        TF fact;
+        for (int j=jstart; j<jend; ++j)
+        {
+            for (int i=istart; i<iend; ++i)
+            {
+                lwp[i+j*jj] = TF(0.0);
+                ki = kend; //set to top of domain
+                for (int k=kstart; k<kend; ++k)
+                {
+                    const int ij   = i + j*jj;
+                    const int ijk  = i + j*jj + k*kk;
+                    const int km1 = std::max(1,k-1);
+                    lwp[ij] = lwp[ij] + std::max( TF(0.0) , ql[ijk] * rhoref[k] * (z[k]-z[km1]));
+                    flx[ijk] = fr1 * std::exp(TF(-1.0) * xka * lwp[ij]);
+                    if ( (ql[ijk] > TF(0.01E-3) ) && ( qt[ijk] >= TF(0.008) ) ) ki = k; //this is the PBLH index
+                }
                 fact = div * cp * rhoref[ki];
                 const int ij   = i + j*jj;
                 flx[ij + kstart*kk] = flx[ij + kstart*kk] + fr0 * std::exp(TF(-1.0) * xka *lwp[ij]);
@@ -127,16 +141,45 @@ namespace
                     if ((k>ki) && (ki>1) && (fact>0.))
                     { //above PBLH
                         flx[ijk] = flx[ijk] + fact * ( TF(0.25) * std::pow(z[k]-z[ki],TF(1.333)) + z[ki] * std::pow(z[k]-z[ki],TF(0.33333)) );
-                    } //every hard coded values need to be in TF, so that it's not casting double to single
+                    }
+                }
+            } // end of i
+        } // end of j
+    }
+    template<typename TF> //EW: simplified radiative parameterization for LW and SW fluxes for DYCOMS
+    void exec_gcss_rad(
+            TF* const restrict tt, const TF* const restrict ql, const TF* const restrict qt,
+            TF* const restrict lwp, TF* const restrict flx, const TF* const restrict rhoref,
+            const TF* const z, const TF* const dzi,
+            const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
+            const int icells, const int ijcells)
+    {
+        const int jj = icells;
+        const int kk = ijcells;
+        const TF mu = 0.05;//zenith(32.5,time); //zenith
+        const TF cp = 1005; //can read this from constant.h
+        //call LW
+        get_gcss_rad_LW<TF>(ql,qt,
+        lwp,flx,rhoref,
+        z,dzi,
+        istart,iend,jstart,jend,kstart,kend,
+        icells,ijcells);
+        for (int j=jstart; j<jend; ++j)
+        {
+            for (int i=istart; i<iend; ++i)
+            {
+                // if (mu>0.035)
+                // {
+                //     //call shortwave
+                // } //end if mu
+                for (int k=kstart+1;k<kend;++k)
+                {
+                    const int ij   = i + j*jj;
+                    const int ijk  = i + j*jj + k*kk;
+                    const int km1 = std::max(kstart+1,k-1);
+                    const int ijkm = i + j*jj + km1*kk;
                     tt[ijk] = tt[ijk] - (flx[ijk] - flx[ijkm]) * dzi[k] / (rhoref[k] * cp);
                     // tt[ijk] = tt[ijk]+(swn[ijk]-swn[ijkm])*dzh[k]/(fields.rhoref[k]*cp); //no SW for now
-
-                    if ((i==15)&&(j==10)&&(std::fmod(time,double(900.))<double(5.)))
-                    {
-                        master.print_message("t = %f ", time);
-                        master.print_message("k = %f ", z[k]);
-                        master.print_message("flx = %f\n", flx[ijk]);
-                    }
                 }
             } // end of i
         } // end of j
@@ -355,12 +398,12 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time)
         auto flx = fields.get_tmp();
         auto ql  = fields.get_tmp();
         thermo.get_thermo_field(*ql,"ql",false,false);
-        calc_gcss_rad<TF>(
+        exec_gcss_rad<TF>(
             fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
             lwp->fld.data(), flx->fld.data(), fields.rhoref.data(),
             gd.z.data(), gd.dzhi.data(),
             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-            gd.icells, gd.ijcells, master, time);
+            gd.icells, gd.ijcells);
         fields.release_tmp(lwp);
         fields.release_tmp(flx);
         fields.release_tmp(ql);
@@ -404,7 +447,7 @@ void Radiation<TF>::create_cross(Cross<TF>& cross)
         std::vector<std::string> rflxvars  = cross.get_enabled_variables(allowed_crossvars_rflx);
         if (rflxvars.size() > 0)
             swcross_rflx  = true;
-        crosslist = bvars;
+        crosslist = rflxvars;
     }
 }
 
@@ -435,6 +478,7 @@ void Radiation<TF>::create_dump(Dump<TF>& dump)
 template<typename TF>
 void Radiation<TF>::exec_stats(Stats<TF>& stats)
 {
+    auto& gd = grid.get_grid_data();
 
 }
 
