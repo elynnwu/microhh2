@@ -422,9 +422,16 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time)
         fields.release_tmp(ql);
     }
 }
-
 template<typename TF>
-void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name)
+bool Radiation<TF>::check_field_exists(const std::string name)
+{
+    if (name == "rflx")
+        return true;
+    else
+        return false;
+}
+template<typename TF>
+void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name, Thermo<TF>& thermo)
 {
     if (name == "rflx")
     {
@@ -514,7 +521,7 @@ void Radiation<TF>::create_dump(Dump<TF>& dump)
 }
 
 template<typename TF>
-void Radiation<TF>::exec_stats(Stats<TF>& stats)
+void Radiation<TF>::exec_stats(Stats<TF>& stats, Thermo<TF>& thermo)
 {
     auto& gd = grid.get_grid_data();
 
@@ -523,7 +530,7 @@ void Radiation<TF>::exec_stats(Stats<TF>& stats)
 
     auto flx = fields.get_tmp();
     flx->loc = gd.sloc;
-    get_radiation_field(*flx,"rflx");
+    get_radiation_field(*flx,"rflx",thermo);
 
     //if daytime, rflx = LW + SW
     // calculate the mean
@@ -534,14 +541,14 @@ void Radiation<TF>::exec_stats(Stats<TF>& stats)
 }
 
 template<typename TF>
-void Radiation<TF>::exec_column(Column<TF>& column)
+void Radiation<TF>::exec_column(Column<TF>& column, Thermo<TF>& thermo)
 {
     auto& gd = grid.get_grid_data();
     const TF no_offset = 0.;
 
     auto flx = fields.get_tmp();
     flx->loc = gd.sloc;
-    get_radiation_field(*flx,"rflx");
+    get_radiation_field(*flx,"rflx",thermo);
 
     column.calc_column("rflx", flx->fld.data(), no_offset);
 
@@ -549,7 +556,7 @@ void Radiation<TF>::exec_column(Column<TF>& column)
 }
 
 template<typename TF>
-void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime)
+void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime, Thermo<TF>& thermo)
 {
     auto& gd = grid.get_grid_data();
     auto flx = fields.get_tmp();
@@ -557,7 +564,7 @@ void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime)
 
     if(swcross_rflx)
     {
-        get_radiation_field(*flx,"rflx");
+        get_radiation_field(*flx,"rflx",thermo);
     }
     for (auto& it : crosslist)
     {
@@ -568,7 +575,7 @@ void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime)
 }
 
 template<typename TF>
-void Radiation<TF>::exec_dump(Dump<TF>& dump, unsigned long iotime)
+void Radiation<TF>::exec_dump(Dump<TF>& dump, unsigned long iotime, Thermo<TF>& thermo)
 {
     auto& gd = grid.get_grid_data();
     auto flx = fields.get_tmp();
@@ -577,7 +584,7 @@ void Radiation<TF>::exec_dump(Dump<TF>& dump, unsigned long iotime)
     {
         if (it == "rflx")
             {
-                get_radiation_field(*flx,"rflx");
+                get_radiation_field(*flx,"rflx",thermo);
             }
         else
         {

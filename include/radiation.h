@@ -49,12 +49,13 @@ class Radiation
         void create(Thermo<TF>&, Stats<TF>&, Column<TF>&, Cross<TF>&, Dump<TF>&);
         void exec(Thermo<TF>&, double);
 
-        void get_radiation_field(Field3d<TF>&, std::string);
+        bool check_field_exists(std::string name);
+        void get_radiation_field(Field3d<TF>&, std::string, Thermo<TF>&);
 
-        void exec_stats(Stats<TF>&);
-        void exec_cross(Cross<TF>&, unsigned long);
-        void exec_dump(Dump<TF>&, unsigned long);
-        void exec_column(Column<TF>&);
+        void exec_stats(Stats<TF>&, Thermo<TF>&);
+        void exec_cross(Cross<TF>&, unsigned long, Thermo<TF>&);
+        void exec_dump(Dump<TF>&, unsigned long, Thermo<TF>&);
+        void exec_column(Column<TF>&, Thermo<TF>&);
     private:
         Master& master;
         Grid<TF>& grid;
