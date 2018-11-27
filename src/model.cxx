@@ -514,7 +514,7 @@ void Model<TF>::calculate_statistics(int iteration, double time, unsigned long i
         diff     ->exec_stats(*stats);
         //budget  ->exec_stats(&stats->masks[maskname]);
         boundary ->exec_stats(*stats);
-        radiation->exec_stats(*stats,*thermo)
+        radiation->exec_stats(*stats,*thermo);
         // Store the statistics data.
         stats->exec(iteration, time, itime);
     }
@@ -525,7 +525,7 @@ void Model<TF>::calculate_statistics(int iteration, double time, unsigned long i
         fields   ->exec_cross(*cross, iotime);
         thermo   ->exec_cross(*cross, iotime);
         microphys->exec_cross(*cross, iotime);
-        radiation->exec_cross(*cross, iotime,*thermo)
+        radiation->exec_cross(*cross, iotime,*thermo);
         // boundary->exec_cross(iotime);
     }
 
