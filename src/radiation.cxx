@@ -24,7 +24,7 @@
 #include <string>
 #include <iostream>
 #include <algorithm>
-
+#include <cmath>
 #include "radiation.h"
 #include "master.h"
 #include "grid.h"
@@ -32,6 +32,11 @@
 #include "thermo.h"
 #include "input.h"
 #include "data_block.h"
+#include "stats.h"
+#include "cross.h"
+#include "dump.h"
+#include "column.h"
+#include "field3d_operators.h"
 
 namespace
 {
@@ -97,7 +102,7 @@ namespace
     }
 
     template<typename TF>
-    void get_gcss_rad_LW(const TF* const restrict ql, const TF* const restrict qt,
+    void calc_gcss_rad_LW(const TF* const restrict ql, const TF* const restrict qt,
     TF* const restrict lwp, TF* const restrict flx, const TF* const restrict rhoref,
     const TF* const z, const TF* const dzi,
     const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
@@ -159,7 +164,7 @@ namespace
         const TF mu = 0.05;//zenith(32.5,time); //zenith
         const TF cp = 1005; //can read this from constant.h
         //call LW
-        get_gcss_rad_LW<TF>(ql,qt,
+        calc_gcss_rad_LW<TF>(ql,qt,
         lwp,flx,rhoref,
         z,dzi,
         istart,iend,jstart,jend,kstart,kend,
@@ -263,7 +268,7 @@ void Radiation<TF>::init()
 }
 
 template<typename TF>
-void Radiation<TF>::create(Thermo<TF>& thermo)
+void Radiation<TF>::create(Thermo<TF>& thermo,Stats<TF>& stats, Column<TF>& column, Cross<TF>& cross, Dump<TF>& dump)
 {
     if (swradiation == Radiation_type::Disabled)
         return;
@@ -328,6 +333,14 @@ void Radiation<TF>::create(Thermo<TF>& thermo)
     data_block.get_vector(n2ovmr, "wkl4", nlay, 0, 0);
     data_block.get_vector(ch4vmr, "wkl6", nlay, 0, 0);
     data_block.get_vector(o2vmr, "wkl7", nlay, 0, 0);
+    }
+    if (swradiation == Radiation_type::Gcss) //only write stats if it's gcss for now
+    {
+        // Set up output classes
+        create_stats(stats);
+        create_column(column);
+        create_dump(dump);
+        create_cross(cross);
     }
 }
 
@@ -411,6 +424,31 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time)
 }
 
 template<typename TF>
+void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name)
+{
+    if (name == "rflx")
+    {
+        auto& gd = grid.get_grid_data();
+
+        const TF no_offset = 0.;
+        const TF no_threshold = 0.;
+
+        auto lwp = fields.get_tmp();
+        auto flx = fields.get_tmp();
+        auto ql  = fields.get_tmp();
+        thermo.get_thermo_field(*ql,"ql",false,false);
+        calc_gcss_rad_LW(ql->fld.data(), fields.ap.at("qt")->fld.data(),
+        lwp->fld.data(), fld.fld.data(), fields.rhoref.data(),
+        gd.z.data(), gd.dzi.data(),
+        gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
+        gd.icells, gd.ijcells);
+        fields.release_tmp(lwp);
+        fields.release_tmp(flx);
+        fields.release_tmp(ql);
+    }
+}
+
+template<typename TF>
 void Radiation<TF>::create_stats(Stats<TF>& stats)
 {
     if (stats.get_switch())
@@ -480,24 +518,75 @@ void Radiation<TF>::exec_stats(Stats<TF>& stats)
 {
     auto& gd = grid.get_grid_data();
 
+    const TF no_offset = 0.;
+    const TF no_threshold = 0.;
+
+    auto flx = fields.get_tmp();
+    flx->loc = gd.sloc;
+    get_radiation_field(*flx,"rflx");
+
+    //if daytime, rflx = LW + SW
+    // calculate the mean
+    std::vector<std::string> operators = {"mean"}; //add 2nd moment, if needed
+    stats.calc_stats("rflx", *flx, no_offset, no_threshold, operators);
+
+    fields.release_tmp(flx);
 }
 
 template<typename TF>
 void Radiation<TF>::exec_column(Column<TF>& column)
 {
+    auto& gd = grid.get_grid_data();
+    const TF no_offset = 0.;
 
+    auto flx = fields.get_tmp();
+    flx->loc = gd.sloc;
+    get_radiation_field(*flx,"rflx");
+
+    column.calc_column("rflx", flx->fld.data(), no_offset);
+
+    fields.release_tmp(flx);
 }
 
 template<typename TF>
 void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime)
 {
+    auto& gd = grid.get_grid_data();
+    auto flx = fields.get_tmp();
+    flx->loc = gd.sloc;
 
+    if(swcross_rflx)
+    {
+        get_radiation_field(*flx,"rflx");
+    }
+    for (auto& it : crosslist)
+    {
+        if (it == "rflx")
+            cross.cross_simple(flx->fld.data(), "rflx", iotime);
+    }
+    fields.release_tmp(flx);
 }
 
 template<typename TF>
 void Radiation<TF>::exec_dump(Dump<TF>& dump, unsigned long iotime)
 {
+    auto& gd = grid.get_grid_data();
+    auto flx = fields.get_tmp();
 
+    for (auto& it : dumplist)
+    {
+        if (it == "rflx")
+            {
+                get_radiation_field(*flx,"rflx");
+            }
+        else
+        {
+            master.print_error("Radiation dump of field \"%s\" not supported\n", it.c_str());
+            throw std::runtime_error("Error in Radiation Dump");
+        }
+        dump.save_dump(flx->fld.data(), it, iotime);
+    }
+    fields.release_tmp(flx);
 }
 
 template class Radiation<double>;

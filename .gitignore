@@ -1,1 +1,3 @@
 # Files to be kept under a git clean -f
+build/
+config/

@@ -33,6 +33,11 @@ class Input;
 template<typename> class Grid;
 template<typename> class Fields;
 template<typename> class Thermo;
+template<typename> class Stats;
+template<typename> class Column;
+template<typename> class Dump;
+template<typename> class Cross;
+template<typename> class Field3d;
 
 template<typename TF>
 class Radiation
@@ -41,8 +46,10 @@ class Radiation
         Radiation(Master&, Grid<TF>&, Fields<TF>&, Input&);
         ~Radiation();
         void init();
-        void create(Thermo<TF>&);
+        void create(Thermo<TF>&, Stats<TF>&, Column<TF>&, Cross<TF>&, Dump<TF>&);
         void exec(Thermo<TF>&, double);
+
+        void get_radiation_field(Field3d<TF>&, std::string);
 
         void exec_stats(Stats<TF>&);
         void exec_cross(Cross<TF>&, unsigned long);
