@@ -441,7 +441,6 @@ void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name, Ther
         const TF no_threshold = 0.;
 
         auto lwp = fields.get_tmp();
-        auto flx = fields.get_tmp();
         auto ql  = fields.get_tmp();
         thermo.get_thermo_field(*ql,"ql",false,false);
         calc_gcss_rad_LW(ql->fld.data(), fields.ap.at("qt")->fld.data(),
@@ -450,7 +449,6 @@ void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name, Ther
         gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
         gd.icells, gd.ijcells);
         fields.release_tmp(lwp);
-        fields.release_tmp(flx);
         fields.release_tmp(ql);
     }
 }

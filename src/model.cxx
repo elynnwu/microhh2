@@ -362,6 +362,7 @@ void Model<TF>::exec()
                     {
                         fields->exec_column(*column);
                         thermo->exec_column(*column);
+                        radiation->exec_column(*column);
                         column->exec(timeloop->get_iteration(), timeloop->get_time(), timeloop->get_itime());
                     }
 
