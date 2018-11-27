@@ -44,17 +44,17 @@ for k in range(kmax):
   ug[k] = 7
 
   # u-wind component
-  v[k] = -5.5
+  v[k] = -4.25
   
   # ug-wind component
-  vg[k] = -4.25
+  vg[k] = -5.5
 
 
 
 # write the data to a file
 proffile = open('dycoms.prof','w')
-proffile.write('{0:^20s} {1:^20s} {2:^20s} {3:^20s} {4:^20s} {5:^20s}\n'.format('z','thl','qt','ug','vg','wls'))
+proffile.write('{0:^20s} {1:^20s} {2:^20s} {3:^20s} {4:^20s} {5:^20s} {6:^20s} {7:^20s}\n'.format('z','thl','qt','u','ug','v','vg','wls'))
 for k in range(kmax):
-  proffile.write('{0:1.14E} {1:1.14E} {2:1.14E} {3:1.14E} {4:1.14E} {5:1.14E}\n'.format(z[k], thl[k], qt[k], ug[k], vg[k], wls[k]))
+  proffile.write('{0:1.14E} {1:1.14E} {2:1.14E} {3:1.14E} {4:1.14E} {5:1.14E} {6:1.14E} {7:1.14E}\n'.format(z[k], thl[k], qt[k],u[k], ug[k],v[k], vg[k], wls[k]))
 proffile.close()
 
