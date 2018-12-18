@@ -38,6 +38,7 @@ template<typename> class Column;
 template<typename> class Dump;
 template<typename> class Cross;
 template<typename> class Field3d;
+template<typename> class Timeloop;
 
 template<typename TF>
 class Radiation
