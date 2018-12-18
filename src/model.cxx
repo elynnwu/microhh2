@@ -324,7 +324,7 @@ void Model<TF>::exec()
                 microphys->exec(*thermo, timeloop->get_sub_time_step());
 
                 // Calculate the radiation fluxes and the related heating rate.
-                radiation->exec(*thermo,timeloop->get_time());
+                radiation->exec(*thermo,timeloop->get_time(),*timeloop);
 
                 // Calculate the tendency due to damping in the buffer layer.
                 buffer->exec();
