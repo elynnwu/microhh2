@@ -26,6 +26,7 @@
 #include <sys/time.h>
 #include <string>
 #include <vector>
+#include <time.h>
 
 class Master;
 template<typename> class Grid;
@@ -82,6 +83,7 @@ class Timeloop
         unsigned long get_idt()   { return idt;   }
         int get_iotime()    { return iotime;    }
         int get_iteration() { return iteration; }
+        struct tm get_realtime() {return datetime;}
 
     private:
         Master& master;
@@ -108,6 +110,7 @@ class Timeloop
         double endtime;
         double savetime;
         double postproctime;
+        struct tm datetime = {0};
 
         int iteration;
         int iotime;

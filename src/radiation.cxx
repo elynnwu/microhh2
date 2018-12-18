@@ -37,6 +37,7 @@
 #include "dump.h"
 #include "column.h"
 #include "field3d_operators.h"
+#include "timeloop.h"
 
 namespace
 {
@@ -59,7 +60,7 @@ namespace
     */
 
     template<typename TF>
-    void get_gcss_rad_SW(const TF* const restrict ql, const TF* const restrict qt, const TF* const restrict rhoref,
+    void calc_gcss_rad_SW(const TF* const restrict ql, const TF* const restrict qt, const TF* const restrict rhoref,
         const TF* const z, const TF* const dzi,
         const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
         const int icells, const int ijcells
@@ -163,6 +164,7 @@ namespace
         const int kk = ijcells;
         const TF mu = 0.05;//zenith(32.5,time); //zenith
         const TF cp = 1005; //can read this from constant.h
+
         //call LW
         calc_gcss_rad_LW<TF>(ql,qt,
         lwp,flx,rhoref,
@@ -345,7 +347,7 @@ void Radiation<TF>::create(Thermo<TF>& thermo,Stats<TF>& stats, Column<TF>& colu
 }
 
 template<typename TF>
-void Radiation<TF>::exec(Thermo<TF>& thermo, double time)
+void Radiation<TF>::exec(Thermo<TF>& thermo, double time, Timeloop<TF>& timeloop)
 {
     if (swradiation == Radiation_type::Disabled)
         return;
