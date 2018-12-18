@@ -83,7 +83,7 @@ class Timeloop
         unsigned long get_idt()   { return idt;   }
         int get_iotime()    { return iotime;    }
         int get_iteration() { return iteration; }
-        struct tm get_realtime() {return datetime;}
+        struct tm get_realtime() { return datetime; }
 
     private:
         Master& master;

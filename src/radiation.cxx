@@ -412,11 +412,12 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time, Timeloop<TF>& timeloop
         auto lwp = fields.get_tmp();
         auto flx = fields.get_tmp();
         auto ql  = fields.get_tmp();
-        struct tm * current_datetime = *timeloop->get_realtime();
-        mktime ( current_datetime ); //refresh time
-        std::cout << "Current jday is: " << current_datetime->tm_mday
-                  << ",Hour: " << current_datetime->tm_hour
-                  << ",Min: " << current_datetime->tm_min << std::endl;
+        struct tm current_datetime;
+        current_datetime = timeloop.get_realtime();
+        mktime ( &current_datetime ); //refresh time
+        std::cout << "Current jday is: " << current_datetime.tm_mday
+                  << ", Hour: " << current_datetime.tm_hour
+                  << ", Min: " << current_datetime.tm_min << std::endl;
         exec_gcss_rad<TF>(
             fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
             lwp->fld.data(), flx->fld.data(), fields.rhoref.data(),
