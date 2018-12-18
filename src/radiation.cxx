@@ -413,7 +413,7 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time, Timeloop<TF>& timeloop
         auto flx = fields.get_tmp();
         auto ql  = fields.get_tmp();
         thermo.get_thermo_field(*ql,"ql",false,false);
-        struct tm current_datetime = timeloop->get_realtime();
+        struct tm * current_datetime = timeloop->get_realtime();
         mktime ( current_datetime ); //refresh time
         std::cout << "Current jday is: " << current_datetime->tm_mday
                   << ",Hour: " << current_datetime->tm_hour
