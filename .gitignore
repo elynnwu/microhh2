@@ -4,3 +4,6 @@ config/
 *.png
 *.nc
 *Store
+*00
+microhh
+*.out

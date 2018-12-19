@@ -46,14 +46,14 @@ Timeloop<TF>::Timeloop(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsin,
     {
         starttime = 0.;
         datetime.tm_year = 2018 - 1900;
-        datetime.tm_yday = input.get_item<int>("time", "jday"  , "", 0);
+        datetime.tm_mday = input.get_item<int>("time", "jday"  , "", 0);
     }
     else
     {
         starttime = input.get_item<double>("time", "starttime", "");
         datetime.tm_sec = starttime;
         datetime.tm_year = 2018 - 1900;
-        datetime.tm_yday = input.get_item<int>("time", "jday"  , "", 0);        
+        datetime.tm_mday = input.get_item<int>("time", "jday"  , "", 0);        
     }
 
     endtime  = input.get_item<double>("time", "endtime" , "");

@@ -58,6 +58,33 @@ namespace
                 double *duflx_dt,double *duflxc_dt );
     }
     */
+    template<typename TF>
+    TF zenith(const TF lat, struct tm datetime)
+    {
+        const TF pi        = M_PI;
+        const TF year2days = 365.;
+        const TF piAngle   = 180.;
+        const TF day2secs  = 86400.;
+        const TF z1        = 279.934;
+        const TF z2        = 1.914827;
+        const TF z3        = 0.7952;
+        const TF z4        = 0.019938;
+        const TF z5        = 0.00162;
+        const TF z6        = 23.4439;
+        TF current_time_secs = datetime.tm_hour * TF(3600.) +
+                               datetime.tm_min * TF(60.) +
+                               datetime.tm_sec;
+        TF lamda   = lat * pi / piAngle;
+        TF d       = TF(2.) * pi * TF(datetime.tm_yday + 1) / year2days;
+        TF sig     = d + pi/piAngle * (z1 + z2*std::sin(d)
+                                                  - z3*std::cos(d)
+                                                  + z4*std::sin(TF(2.)*d)
+                                                  - z5*std::cos(TF(2.)*d));
+        TF del     = std::asin(std::sin(z6*pi / piAngle)*std::sin(sig));
+        TF h       = TF(2.) * pi * ((current_time_secs/day2secs)-0.5);
+        TF mu      = std::sin(lamda) * std::sin(del) + std::cos(lamda) * std::cos(del) * std::cos(h);
+        return mu;
+    }
 
     template<typename TF>
     void calc_gcss_rad_SW(const TF* const restrict ql, const TF* const restrict qt, const TF* const restrict rhoref,
@@ -413,13 +440,14 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time, Timeloop<TF>& timeloop
         auto flx = fields.get_tmp();
         auto ql  = fields.get_tmp();
         struct tm current_datetime;
+        TF mu;
+        const TF lat = 32.5;
         current_datetime = timeloop.get_realtime();
         mktime ( &current_datetime ); //refresh time
-        std::cout << "Current month: " << current_datetime.tm_mon
-                  << ", Day: " << current_datetime.tm_mday
-                  << ", Hour: " << current_datetime.tm_hour
-                  << ", Min: " << current_datetime.tm_min <<
-                  << ", Sec: " << current_datetime.tm_sec << std::endl;
+        mu = zenith<TF>(lat, current_datetime);
+        std::cout << "Current hour: " << current_datetime.tm_hour
+                  << ", minute: " << current_datetime.tm_min
+                  << ", zenith: " << mu << std::endl;
         exec_gcss_rad<TF>(
             fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
             lwp->fld.data(), flx->fld.data(), fields.rhoref.data(),
