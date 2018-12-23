@@ -23,7 +23,6 @@
 #include <iostream>
 #include <cstdio>
 #include <cmath>
-#include <stdlib.h> /* div, div_t */
 #include "input.h"
 #include "master.h"
 #include "grid.h"
@@ -54,14 +53,11 @@ Timeloop<TF>::Timeloop(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsin,
         phystarttime = starttime + input.get_item<double>("time", "phystarttime"  , "", 0.);
     }
 
-    std::div_t dv = std::div(int(phystarttime),3600);
-    datetime.tm_hour = dv.quot;
-    dv = std::div(dv.rem,60);
-    datetime.tm_min  = dv.quot;
-    datetime.tm_sec  = dv.rem;
+    datetime.tm_sec  = phystarttime;
     datetime.tm_year = 2018 - 1900;
     datetime.tm_mday = input.get_item<int>("time", "jday"  , "", 1);
     datetime.tm_isdst = -1;
+    mktime ( &datetime );
 
     endtime  = input.get_item<double>("time", "endtime" , "");
     savetime = input.get_item<double>("time", "savetime", "");

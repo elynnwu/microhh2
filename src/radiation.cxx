@@ -90,10 +90,66 @@ namespace
     }
 
     template<typename TF>
+    void sunray(double mu, const int i, const int j,
+        const int kstart, const int kend, const int icells, const int ijcells,
+        std::vector<TF> tau, const TF tauc,
+        TF* const restrict swn)
+    {
+        const int jj = icells;
+        const int kk = ijcells;
+        TF sw0 = TF(1100.);
+        TF gc  = TF(0.85);
+        TF sfc_albedo = TF(0.05);
+        TF taucde = 0.;
+        TF taupath = 0.;
+        std::vector<TF> taude(kend , TF(0.));
+        TF omega  = 1. - 1.e-3 * (0.9 + 2.75 * (mu+1.) * std::exp(-0.09 * tauc)); //fouquart
+        TF ff     = gc * gc;
+        TF gcde   = gc / (1. + gc);
+        taucde = (1.0 - omega*ff) * tauc;
+        for (int k=kstart;k<kend;++k)
+        {
+            taude[k] = (1. - omega*ff ) * tau[k];
+        }
+        TF omegade = (1.-ff) * omega/(1. - omega*ff);
+        TF x1  = 1. - omegade * gcde;
+        TF x2  = 1. - omegade;
+        TF rk  = std::sqrt(3. * x2 * x1);
+        TF mu2 = mu * mu;
+        TF x3  = 4.0 * (1.0 - rk*rk*mu2);
+        TF rp  = std::sqrt(3. * x2/x1);
+        TF alpha = 3. * omegade * mu2 * (1.0 + gcde*x2) / x3;
+        TF beta  = 3. * omegade * mu * (1.0 + 3.0*gcde*mu2*x2) / x3;
+
+        TF rtt = 2.0/3.0;
+        TF exmu0 = std::exp(-taucde / mu);
+        TF expk  = std::exp(rk * taucde);
+        TF exmk  = 1.0 / expk;
+        TF xp23p = 1.0 + rtt*rp;
+        TF xm23p = 1.0 - rtt*rp;
+        TF ap23b = alpha + rtt*beta;
+
+        TF t1 = 1. - sfc_albedo - rtt * (1. + sfc_albedo) * rp;
+        TF t2 = 1. - sfc_albedo + rtt * (1. + sfc_albedo) * rp;
+        TF t3 = (1. - sfc_albedo) * alpha - rtt * (1 + sfc_albedo) * beta + sfc_albedo*mu;
+        TF c2 = (xp23p*t3*exmu0 - t1*ap23b*exmk) / (xp23p*t2*expk - xm23p*t1*exmk);
+        TF c1 = (ap23b - c2*xm23p)/xp23p;
+
+        for (int k=kend;k<kstart;--k)
+        {
+            const int ijk  = i + j*jj + k*kk;
+            taupath = taupath + taude[k];
+            swn[ijk] = sw0 * (4./3.) * (rp * (c1*std::exp(-rk*taupath)
+            - c2 * std::exp(rk*taupath)) - beta * std::exp(-taupath/mu))
+            + mu * sw0 * std::exp(-taupath / mu);
+        }
+    }
+
+    template<typename TF>
     void calc_gcss_rad_SW(const TF* const restrict ql, const TF* const restrict qt, const TF* const restrict rhoref,
-        const TF* const z, const TF* const dzi,
+        const TF* const z, const TF* const dzi, TF* const restrict swn,
         const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
-        const int icells, const int ijcells
+        const int icells, const int ijcells, double mu
     )
     {
         const int jj = icells;
@@ -103,31 +159,28 @@ namespace
         TF tauc;
         TF fact;
         int ki; //PBLH index
-        std::vector<TF> tau;
-        tau.resize(kend); //kcells so that it takes care of the ghost cells
-        const TF mu = 0.05;//zenith(32.5,time); //zenith
+        std::vector<TF> tau(kend,TF(0.));
         for (int j=jstart; j<jend; ++j)
         {
             for (int i=istart; i<iend; ++i)
             {
-                if (mu>0.035)
+                tauc = TF(0.0);
+                for (int k=kstart;k<kend;++k)
                 {
-                    tauc = TF(0.0);
-                    for (int k=kstart;k<kend;++k)
+                    const int ij   = i + j*jj;
+                    const int ijk  = i + j*jj + k*kk;
+                    const int km1 = std::max(1,k-1);
+                    tau[k] = TF(0.0);
+                    if (ql[ijk]>1.E-5)
                     {
-                        const int ij   = i + j*jj;
-                        const int ijk  = i + j*jj + k*kk;
-                        const int km1 = std::max(1,k-1);
-                        tau[k] = TF(0.0);
-                        if (ql[ijk]>1.E-5)
-                        {
-                            tau[k] = std::max(TF(0.0) , TF(1.5) * ql[ijk] * rhoref[k] * (z[k]-z[km1]) / reff / rho_l);
-                            tauc = tauc + tau[k];
-                        }
+                        tau[k] = std::max(TF(0.0) , TF(1.5) * ql[ijk] * rhoref[k] * (z[k]-z[km1]) / reff / rho_l);
+                        tauc = tauc + tau[k];
                     }
-                    //sunray
-                    // swn = 1.0; //no SW for now
-                } //end if mu
+                }
+                sunray<TF>(mu, i, j,
+                    kstart, kend, icells, ijcells,
+                    tau, tauc,
+                    swn);
             }
         }
     }
@@ -185,14 +238,13 @@ namespace
     template<typename TF> //EW: simplified radiative parameterization for LW and SW fluxes for DYCOMS
     void exec_gcss_rad(
             TF* const restrict tt, const TF* const restrict ql, const TF* const restrict qt,
-            TF* const restrict lwp, TF* const restrict flx, const TF* const restrict rhoref,
+            TF* const restrict lwp, TF* const restrict flx, TF* const restrict swn, const TF* const restrict rhoref,
             const TF* const z, const TF* const dzi,
             const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
-            const int icells, const int ijcells)
+            const int icells, const int ijcells, double mu)
     {
         const int jj = icells;
         const int kk = ijcells;
-        const TF mu = 0.05;//zenith(32.5,time); //zenith
         const TF cp = 1005; //can read this from constant.h
 
         //call LW
@@ -205,10 +257,6 @@ namespace
         {
             for (int i=istart; i<iend; ++i)
             {
-                // if (mu>0.035)
-                // {
-                //     //call shortwave
-                // } //end if mu
                 for (int k=kstart+1;k<kend;++k)
                 {
                     const int ij   = i + j*jj;
@@ -216,10 +264,30 @@ namespace
                     const int km1 = std::max(kstart+1,k-1);
                     const int ijkm = i + j*jj + km1*kk;
                     tt[ijk] = tt[ijk] - (flx[ijk] - flx[ijkm]) * dzi[k] / (rhoref[k] * cp);
-                    // tt[ijk] = tt[ijk]+(swn[ijk]-swn[ijkm])*dzh[k]/(fields.rhoref[k]*cp); //no SW for now
                 }
             } // end of i
         } // end of j
+        if (mu>0.035)
+        {
+            calc_gcss_rad_SW<TF>(ql, qt, rhoref,
+                z, dzi, swn,
+                istart, iend, jstart, jend, kstart, kend,
+                icells, ijcells, mu);
+            for (int j=jstart; j<jend; ++j)
+            {
+                for (int i=istart; i<iend; ++i)
+                {
+                    for (int k=kstart+1;k<kend;++k)
+                    {
+                        const int ij   = i + j*jj;
+                        const int ijk  = i + j*jj + k*kk;
+                        const int km1 = std::max(kstart+1,k-1);
+                        const int ijkm = i + j*jj + km1*kk;
+                        tt[ijk] = tt[ijk] + (swn[ijk] - swn[ijkm]) * dzi[k] / (rhoref[k] * cp);
+                    }
+                }
+            }
+        } //end if mu
     } // end of calc_gcss_rad
 }
 
@@ -441,6 +509,7 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time, Timeloop<TF>& timeloop
     {
         auto lwp = fields.get_tmp();
         auto flx = fields.get_tmp();
+        auto swn = fields.get_tmp();
         auto ql  = fields.get_tmp();
         struct tm current_datetime;
         double lat = 32.5;
@@ -453,12 +522,13 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time, Timeloop<TF>& timeloop
                   << ", zenith: " << mu << std::endl;
         exec_gcss_rad<TF>(
             fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
-            lwp->fld.data(), flx->fld.data(), fields.rhoref.data(),
+            lwp->fld.data(), flx->fld.data(), swn->fld.data(), fields.rhoref.data(),
             gd.z.data(), gd.dzhi.data(),
             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-            gd.icells, gd.ijcells);
+            gd.icells, gd.ijcells, mu);
         fields.release_tmp(lwp);
         fields.release_tmp(flx);
+        fields.release_tmp(swn);
         fields.release_tmp(ql);
     }
 }
