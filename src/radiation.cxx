@@ -37,6 +37,7 @@
 #include "cross.h"
 #include "dump.h"
 #include "column.h"
+#include "constants.h"
 #include "field3d_operators.h"
 #include "timeloop.h"
 #include <time.h>
@@ -90,48 +91,51 @@ namespace
     }
 
     template<typename TF>
-    void sunray(double mu, const int i, const int j,
+    void sunray(const TF mu, const int i, const int j,
         const int kstart, const int kend, const int icells, const int ijcells,
         std::vector<TF> tau, const TF tauc,
         TF* const restrict swn)
     {
         const int jj = icells;
         const int kk = ijcells;
+        TF o_c1 = TF(0.9);
+        TF o_c2 = TF(2.75);
+        TF o_c3 = TF(0.09);
         TF sw0 = TF(1100.);
         TF gc  = TF(0.85);
         TF sfc_albedo = TF(0.05);
-        TF taucde = 0.;
-        TF taupath = 0.;
+        TF taucde = TF(0.);
+        TF taupath = TF(0.);
         std::vector<TF> taude(kend , TF(0.));
-        TF omega  = 1. - 1.e-3 * (0.9 + 2.75 * (mu+1.) * std::exp(-0.09 * tauc)); //fouquart
+        TF omega  = TF(1.) - TF(1.e-3) * (o_c1 + o_c2 * (mu+TF(1.)) * std::exp(-o_c3 * tauc)); //fouquart
         TF ff     = gc * gc;
-        TF gcde   = gc / (1. + gc);
-        taucde = (1.0 - omega*ff) * tauc;
-        for (int k=kstart;k<kend;++k)
+        TF gcde   = gc / (TF(1.) + gc);
+        taucde = ( TF(1.0) - omega*ff) * tauc;
+        for (int k=kstart; k<kend; ++k)
         {
-            taude[k] = (1. - omega*ff ) * tau[k];
+            taude[k] = ( TF(1.) - omega*ff ) * tau[k];
         }
-        TF omegade = (1.-ff) * omega/(1. - omega*ff);
-        TF x1  = 1. - omegade * gcde;
-        TF x2  = 1. - omegade;
-        TF rk  = std::sqrt(3. * x2 * x1);
+        TF omegade = (TF(1.)-ff) * omega/(TF(1.) - omega*ff);
+        TF x1  = TF(1.) - omegade * gcde;
+        TF x2  = TF(1.) - omegade;
+        TF rk  = std::sqrt(TF(3.) * x2 * x1);
         TF mu2 = mu * mu;
-        TF x3  = 4.0 * (1.0 - rk*rk*mu2);
-        TF rp  = std::sqrt(3. * x2/x1);
-        TF alpha = 3. * omegade * mu2 * (1.0 + gcde*x2) / x3;
-        TF beta  = 3. * omegade * mu * (1.0 + 3.0*gcde*mu2*x2) / x3;
+        TF x3  = TF(4.) * (TF(1.) - rk*rk*mu2);
+        TF rp  = std::sqrt(TF(3.) * x2/x1);
+        TF alpha = TF(3.) * omegade * mu2 * (TF(1.) + gcde*x2) / x3;
+        TF beta  = TF(3.) * omegade * mu * (TF(1.) + TF(3.)*gcde*mu2*x2) / x3;
 
-        TF rtt = 2.0/3.0;
+        TF rtt = TF(2.0/3.0);
         TF exmu0 = std::exp(-taucde / mu);
         TF expk  = std::exp(rk * taucde);
-        TF exmk  = 1.0 / expk;
-        TF xp23p = 1.0 + rtt*rp;
-        TF xm23p = 1.0 - rtt*rp;
+        TF exmk  = TF(1.) / expk;
+        TF xp23p = TF(1.) + rtt*rp;
+        TF xm23p = TF(1.) - rtt*rp;
         TF ap23b = alpha + rtt*beta;
 
-        TF t1 = 1. - sfc_albedo - rtt * (1. + sfc_albedo) * rp;
-        TF t2 = 1. - sfc_albedo + rtt * (1. + sfc_albedo) * rp;
-        TF t3 = (1. - sfc_albedo) * alpha - rtt * (1 + sfc_albedo) * beta + sfc_albedo*mu;
+        TF t1 = TF(1.) - sfc_albedo - rtt * (TF(1.) + sfc_albedo) * rp;
+        TF t2 = TF(1.) - sfc_albedo + rtt * (TF(1.) + sfc_albedo) * rp;
+        TF t3 = (TF(1.) - sfc_albedo) * alpha - rtt * (TF(1.) + sfc_albedo) * beta + sfc_albedo*mu;
         TF c2 = (xp23p*t3*exmu0 - t1*ap23b*exmk) / (xp23p*t2*expk - xm23p*t1*exmk);
         TF c1 = (ap23b - c2*xm23p)/xp23p;
 
@@ -139,7 +143,7 @@ namespace
         {
             const int ijk  = i + j*jj + k*kk;
             taupath = taupath + taude[k];
-            swn[ijk] = sw0 * (4./3.) * (rp * (c1*std::exp(-rk*taupath)
+            swn[ijk] = sw0 * TF(4./3.) * (rp * (c1*std::exp(-rk*taupath)
             - c2 * std::exp(rk*taupath)) - beta * std::exp(-taupath/mu))
             + mu * sw0 * std::exp(-taupath / mu);
         }
@@ -177,7 +181,7 @@ namespace
                         tauc = tauc + tau[k];
                     }
                 }
-                sunray<TF>(mu, i, j,
+                sunray<TF>(TF(mu), i, j,
                     kstart, kend, icells, ijcells,
                     tau, tauc,
                     swn);
@@ -197,7 +201,7 @@ namespace
         const TF xka = 85.;
         const TF fr0 = 70.;
         const TF fr1 = 22.;
-        const TF cp = 1005; //can read this from constant.h
+        const TF cp = Constants::cp<TF>;
         const TF div = 3.75E-6; //fix divergence for now
         int ki; //pblh index
         TF fact;
@@ -219,7 +223,7 @@ namespace
                 fact = div * cp * rhoref[ki];
                 const int ij   = i + j*jj;
                 flx[ij + kstart*kk] = flx[ij + kstart*kk] + fr0 * std::exp(TF(-1.0) * xka *lwp[ij]);
-                for (int k=kstart+1;k<kend;++k)
+                for (int k=kstart+1; k<kend; ++k)
                 {
                     const int ij   = i + j*jj;
                     const int ijk  = i + j*jj + k*kk;
@@ -245,8 +249,7 @@ namespace
     {
         const int jj = icells;
         const int kk = ijcells;
-        const TF cp = 1005; //can read this from constant.h
-
+        const TF cp = Constants::cp<TF>;
         //call LW
         calc_gcss_rad_LW<TF>(ql,qt,
         lwp,flx,rhoref,
@@ -267,7 +270,7 @@ namespace
                 }
             } // end of i
         } // end of j
-        if (mu>0.035)
+        if (mu>0.035) //if daytime, call SW
         {
             calc_gcss_rad_SW<TF>(ql, qt, rhoref,
                 z, dzi, swn,
