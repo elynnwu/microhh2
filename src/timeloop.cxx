@@ -47,28 +47,21 @@ Timeloop<TF>::Timeloop(Master& masterin, Grid<TF>& gridin, Fields<TF>& fieldsin,
     {
         starttime = 0.;
         phystarttime = input.get_item<double>("time", "phystarttime"  , "", 0.);
-        std::div_t dv = std::div(int(phystarttime),3600);
-        datetime.tm_hour = dv.quot - 1;
-        dv = std::div(dv.rem,60);
-        datetime.tm_min  = dv.quot;
-        datetime.tm_sec  = dv.rem;
-        datetime.tm_year = 2018 - 1900;
-        datetime.tm_mday = input.get_item<int>("time", "jday"  , "", 1) + 1;
-        mktime ( &datetime );
-    }
+   }
     else
     {
         starttime = input.get_item<double>("time", "starttime", "");
         phystarttime = starttime + input.get_item<double>("time", "phystarttime"  , "", 0.);
-        std::div_t dv = std::div(int(phystarttime),3600);
-        datetime.tm_hour = dv.quot - 1;
-        dv = std::div(dv.rem,60);
-        datetime.tm_min  = dv.quot;
-        datetime.tm_sec  = dv.rem;
-        datetime.tm_year = 2018 - 1900;
-        datetime.tm_mday = input.get_item<int>("time", "jday"  , "", 1) + 1;
-        mktime ( &datetime );
     }
+
+    std::div_t dv = std::div(int(phystarttime),3600);
+    datetime.tm_hour = dv.quot;
+    dv = std::div(dv.rem,60);
+    datetime.tm_min  = dv.quot;
+    datetime.tm_sec  = dv.rem;
+    datetime.tm_year = 2018 - 1900;
+    datetime.tm_mday = input.get_item<int>("time", "jday"  , "", 1);
+    datetime.tm_isdst = -1;
 
     endtime  = input.get_item<double>("time", "endtime" , "");
     savetime = input.get_item<double>("time", "savetime", "");
