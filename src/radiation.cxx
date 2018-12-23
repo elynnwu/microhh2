@@ -25,6 +25,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cmath>
+#include <math.h> /* floor */
 #include "radiation.h"
 #include "master.h"
 #include "grid.h"
@@ -75,14 +76,15 @@ namespace
                           (datetime.tm_hour * 3600. +
                            datetime.tm_min * 60. +
                            datetime.tm_sec) / day2secs;
+        double day    = floor(time2sec);
         double lamda  = lat * pi / piAngle;
         double d      = 2. * pi * int(time2sec) / year2days;
-        double sig     = d + pi/piAngle * (z1 + z2*std::sin(d)
+        double sig    = d + pi/piAngle * (z1 + z2*std::sin(d)
                                                   - z3*std::cos(d)
                                                   + z4*std::sin(2.*d)
                                                   - z5*std::cos(2.*d));
         double del     = std::asin(std::sin(z6*pi / piAngle)*std::sin(sig));
-        double h       = 2. * pi * ((current_time_secs/day2secs) - 0.5);
+        double h       = 2. * pi * ((time2sec - day) - 0.5);
         double mu      = std::sin(lamda) * std::sin(del) + std::cos(lamda) * std::cos(del) * std::cos(h);
         return mu;
     }
@@ -445,9 +447,9 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time, Timeloop<TF>& timeloop
         current_datetime = timeloop.get_phytime();
         mktime ( &current_datetime ); //refresh time
         double mu = calc_zenith(current_datetime, lat);
-        std::cout << "Current jday: " << current_datetime.tm_yday-1
-                  << ", hour: " << current_datetime.tm_hour-1
-                  << ", minute: " << current_datetime.tm_min-1
+        std::cout << "Current jday: " << current_datetime.tm_yday
+                  << ", hour: " << current_datetime.tm_hour
+                  << ", minute: " << current_datetime.tm_min
                   << ", zenith: " << mu << std::endl;
         exec_gcss_rad<TF>(
             fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
