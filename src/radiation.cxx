@@ -287,6 +287,7 @@ namespace
                         const int km1 = std::max(kstart+1,k-1);
                         const int ijkm = i + j*jj + km1*kk;
                         tt[ijk] = tt[ijk] + (swn[ijk] - swn[ijkm]) * dzi[k] / (rhoref[k] * cp);
+                        if ((i==10)&(j==10)) std::cout << "k = " << k << ", swn = " << swn[ijk] << "\n";
                     }
                 }
             }
@@ -540,19 +541,17 @@ bool Radiation<TF>::check_field_exists(const std::string name)
 {
     if (name == "rflx")
         return true;
+    else if (name == "sflx")
+        return true;
     else
         return false;
 }
 template<typename TF>
-void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name, Thermo<TF>& thermo)
+void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name, Thermo<TF>& thermo, Timeloop<TF>& timeloop)
 {
     if (name == "rflx")
     {
         auto& gd = grid.get_grid_data();
-
-        const TF no_offset = 0.;
-        const TF no_threshold = 0.;
-
         auto lwp = fields.get_tmp();
         auto ql  = fields.get_tmp();
         thermo.get_thermo_field(*ql,"ql",false,false);
@@ -564,6 +563,34 @@ void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name, Ther
         fields.release_tmp(lwp);
         fields.release_tmp(ql);
     }
+
+    else if (name == "sflx")
+    {
+        struct tm current_datetime;
+        double lat = 32.5;
+        current_datetime = timeloop.get_phytime();
+        mktime ( &current_datetime ); //refresh time
+        double mu = calc_zenith(current_datetime, lat);
+        auto& gd = grid.get_grid_data();
+        if (mu > 0.035) //if daytime, call SW
+        {
+            auto lwp = fields.get_tmp();
+            auto ql  = fields.get_tmp();
+            thermo.get_thermo_field(*ql,"ql",false,false);
+            calc_gcss_rad_SW(ql->fld.data(), fields.ap.at("qt")->fld.data(), fields.rhoref.data(),
+                gd.z.data(), gd.dzi.data(), fld.fld.data(),
+                gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
+                gd.icells, gd.ijcells, mu);
+            fields.release_tmp(lwp);
+            fields.release_tmp(ql);
+        }
+
+        else //night time, set SW to 0
+        {
+            for (int n=0; n<gd.ncells; ++n)
+            fld.fld[n] = TF(0.);
+        }
+    }
 }
 
 template<typename TF>
@@ -572,6 +599,7 @@ void Radiation<TF>::create_stats(Stats<TF>& stats)
     if (stats.get_switch())
     {
         stats.add_prof("rflx", "Total radiative flux", "W m-2", "z");
+        stats.add_prof("sflx", "Total shortwave radiative flux", "W m-2", "z");
         //when full radiation is available, add the following:
         // stats.add_prof("sflxd", "Downward shortwave radiative flux", "W m-2", "z");
         // stats.add_prof("sflxu", "Upward shortwave radiative flux", "W m-2", "z");
@@ -598,7 +626,7 @@ void Radiation<TF>::create_cross(Cross<TF>& cross)
         swcross_rflx = false;
 
         // Vectors with allowed cross variables for radiative flux
-        std::vector<std::string> allowed_crossvars_rflx = {"rflx"};
+        std::vector<std::string> allowed_crossvars_rflx = {"rflx","sflx"};
 
         std::vector<std::string> rflxvars  = cross.get_enabled_variables(allowed_crossvars_rflx);
         if (rflxvars.size() > 0)
@@ -632,7 +660,7 @@ void Radiation<TF>::create_dump(Dump<TF>& dump)
 }
 
 template<typename TF>
-void Radiation<TF>::exec_stats(Stats<TF>& stats, Thermo<TF>& thermo)
+void Radiation<TF>::exec_stats(Stats<TF>& stats, Thermo<TF>& thermo, Timeloop<TF>& timeloop)
 {
     auto& gd = grid.get_grid_data();
 
@@ -641,7 +669,7 @@ void Radiation<TF>::exec_stats(Stats<TF>& stats, Thermo<TF>& thermo)
 
     auto flx = fields.get_tmp();
     flx->loc = gd.sloc;
-    get_radiation_field(*flx,"rflx",thermo);
+    get_radiation_field(*flx,"rflx",thermo, timeloop);
 
     //if daytime, rflx = LW + SW
     // calculate the mean
@@ -652,14 +680,14 @@ void Radiation<TF>::exec_stats(Stats<TF>& stats, Thermo<TF>& thermo)
 }
 
 template<typename TF>
-void Radiation<TF>::exec_column(Column<TF>& column, Thermo<TF>& thermo)
+void Radiation<TF>::exec_column(Column<TF>& column, Thermo<TF>& thermo, Timeloop<TF>& timeloop)
 {
     auto& gd = grid.get_grid_data();
     const TF no_offset = 0.;
 
     auto flx = fields.get_tmp();
     flx->loc = gd.sloc;
-    get_radiation_field(*flx,"rflx",thermo);
+    get_radiation_field(*flx,"rflx",thermo,timeloop);
 
     column.calc_column("rflx", flx->fld.data(), no_offset);
 
@@ -667,7 +695,7 @@ void Radiation<TF>::exec_column(Column<TF>& column, Thermo<TF>& thermo)
 }
 
 template<typename TF>
-void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime, Thermo<TF>& thermo)
+void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime, Thermo<TF>& thermo, Timeloop<TF>& timeloop)
 {
     auto& gd = grid.get_grid_data();
     auto flx = fields.get_tmp();
@@ -675,7 +703,7 @@ void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime, Thermo<TF
 
     if(swcross_rflx)
     {
-        get_radiation_field(*flx,"rflx",thermo);
+        get_radiation_field(*flx,"rflx",thermo,timeloop);
     }
     for (auto& it : crosslist)
     {
@@ -686,7 +714,7 @@ void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime, Thermo<TF
 }
 
 template<typename TF>
-void Radiation<TF>::exec_dump(Dump<TF>& dump, unsigned long iotime, Thermo<TF>& thermo)
+void Radiation<TF>::exec_dump(Dump<TF>& dump, unsigned long iotime, Thermo<TF>& thermo, Timeloop<TF>& timeloop)
 {
     auto& gd = grid.get_grid_data();
     auto flx = fields.get_tmp();
@@ -694,9 +722,13 @@ void Radiation<TF>::exec_dump(Dump<TF>& dump, unsigned long iotime, Thermo<TF>& 
     for (auto& it : dumplist)
     {
         if (it == "rflx")
-            {
-                get_radiation_field(*flx,"rflx",thermo);
-            }
+        {
+            get_radiation_field(*flx,"rflx",thermo,timeloop);
+        }
+        else if (it == "sflx")
+        {
+            get_radiation_field(*flx,"sflx",thermo,timeloop);
+        }
         else
         {
             master.print_error("Radiation dump of field \"%s\" not supported\n", it.c_str());

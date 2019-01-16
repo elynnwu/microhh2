@@ -362,7 +362,7 @@ void Model<TF>::exec()
                     {
                         fields->exec_column(*column);
                         thermo->exec_column(*column);
-                        radiation->exec_column(*column,*thermo);
+                        radiation->exec_column(*column,*thermo,*timeloop);
                         column->exec(timeloop->get_iteration(), timeloop->get_time(), timeloop->get_itime());
                     }
 
@@ -515,7 +515,7 @@ void Model<TF>::calculate_statistics(int iteration, double time, unsigned long i
         diff     ->exec_stats(*stats);
         //budget  ->exec_stats(&stats->masks[maskname]);
         boundary ->exec_stats(*stats);
-        radiation->exec_stats(*stats,*thermo);
+        radiation->exec_stats(*stats,*thermo,*timeloop);
         // Store the statistics data.
         stats->exec(iteration, time, itime);
     }
@@ -526,7 +526,7 @@ void Model<TF>::calculate_statistics(int iteration, double time, unsigned long i
         fields   ->exec_cross(*cross, iotime);
         thermo   ->exec_cross(*cross, iotime);
         microphys->exec_cross(*cross, iotime);
-        radiation->exec_cross(*cross, iotime,*thermo);
+        radiation->exec_cross(*cross, iotime,*thermo,*timeloop);
         // boundary->exec_cross(iotime);
     }
 
@@ -536,7 +536,7 @@ void Model<TF>::calculate_statistics(int iteration, double time, unsigned long i
         fields   ->exec_dump(*dump, iotime);
         thermo   ->exec_dump(*dump, iotime);
         microphys->exec_dump(*dump, iotime);
-        radiation->exec_dump(*dump, iotime,*thermo);
+        radiation->exec_dump(*dump, iotime,*thermo,*timeloop);
     }
 }
 

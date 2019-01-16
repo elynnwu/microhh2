@@ -51,12 +51,12 @@ class Radiation
         void exec(Thermo<TF>&, double, Timeloop<TF>&);
 
         bool check_field_exists(std::string name);
-        void get_radiation_field(Field3d<TF>&, std::string, Thermo<TF>&);
+        void get_radiation_field(Field3d<TF>&, std::string, Thermo<TF>&, Timeloop<TF>&);
 
-        void exec_stats(Stats<TF>&, Thermo<TF>&);
-        void exec_cross(Cross<TF>&, unsigned long, Thermo<TF>&);
-        void exec_dump(Dump<TF>&, unsigned long, Thermo<TF>&);
-        void exec_column(Column<TF>&, Thermo<TF>&);
+        void exec_stats(Stats<TF>&, Thermo<TF>&, Timeloop<TF>&);
+        void exec_cross(Cross<TF>&, unsigned long, Thermo<TF>&, Timeloop<TF>&);
+        void exec_dump(Dump<TF>&, unsigned long, Thermo<TF>&, Timeloop<TF>&);
+        void exec_column(Column<TF>&, Thermo<TF>&, Timeloop<TF>&);
     private:
         Master& master;
         Grid<TF>& grid;
