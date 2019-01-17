@@ -539,9 +539,7 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time, Timeloop<TF>& timeloop
 template<typename TF>
 bool Radiation<TF>::check_field_exists(const std::string name)
 {
-    if (name == "rflx")
-        return true;
-    else if (name == "sflx")
+    if (name == "rflx" || name == "sflx")
         return true;
     else
         return false;
@@ -572,7 +570,7 @@ void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name, Ther
         mktime ( &current_datetime ); //refresh time
         double mu = calc_zenith(current_datetime, lat);
         auto& gd = grid.get_grid_data();
-        if (mu > 0.035) //if daytime, call SW
+        if (mu > 0.035) //if daytime, call SW (make a function for day/night determination)
         {
             auto lwp = fields.get_tmp();
             auto ql  = fields.get_tmp();
@@ -590,6 +588,7 @@ void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name, Ther
             for (int n=0; n<gd.ncells; ++n)
             fld.fld[n] = TF(0.);
         }
+
     }
 }
 
@@ -615,6 +614,7 @@ void Radiation<TF>::create_column(Column<TF>& column)
     if (column.get_switch())
     {
         column.add_prof("rflx", "Total radiative flux", "W m-2", "z");
+        column.add_prof("sflx", "Total shortwave radiative flux", "W m-2", "z");
     }
 }
 
@@ -671,12 +671,19 @@ void Radiation<TF>::exec_stats(Stats<TF>& stats, Thermo<TF>& thermo, Timeloop<TF
     flx->loc = gd.sloc;
     get_radiation_field(*flx,"rflx",thermo, timeloop);
 
+    auto sflx = fields.get_tmp();
+    sflx->loc = gd.sloc;
+    get_radiation_field(*sflx,"sflx",thermo, timeloop);
+
+
     //if daytime, rflx = LW + SW
     // calculate the mean
     std::vector<std::string> operators = {"mean"}; //add 2nd moment, if needed
     stats.calc_stats("rflx", *flx, no_offset, no_threshold, operators);
+    stats.calc_stats("sflx", *sflx, no_offset, no_threshold, operators);
 
     fields.release_tmp(flx);
+    fields.release_tmp(sflx);
 }
 
 template<typename TF>
@@ -688,8 +695,10 @@ void Radiation<TF>::exec_column(Column<TF>& column, Thermo<TF>& thermo, Timeloop
     auto flx = fields.get_tmp();
     flx->loc = gd.sloc;
     get_radiation_field(*flx,"rflx",thermo,timeloop);
-
     column.calc_column("rflx", flx->fld.data(), no_offset);
+
+    get_radiation_field(*flx,"sflx",thermo,timeloop);
+    column.calc_column("sflx", flx->fld.data(), no_offset);
 
     fields.release_tmp(flx);
 }
@@ -699,8 +708,10 @@ void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime, Thermo<TF
 {
     auto& gd = grid.get_grid_data();
     auto flx = fields.get_tmp();
-    flx->loc = gd.sloc;
+    auto sflx = fields.get_tmp();
 
+    flx->loc = gd.sloc;
+    sflx->loc = gd.sloc;
     if(swcross_rflx)
     {
         get_radiation_field(*flx,"rflx",thermo,timeloop);
@@ -709,34 +720,37 @@ void Radiation<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime, Thermo<TF
     {
         if (it == "rflx")
             cross.cross_simple(flx->fld.data(), "rflx", iotime);
+        else if (it == "sflx")
+            cross.cross_simple(sflx->fld.data(), "sflx", iotime);
     }
     fields.release_tmp(flx);
+    fields.release_tmp(sflx);
 }
 
 template<typename TF>
 void Radiation<TF>::exec_dump(Dump<TF>& dump, unsigned long iotime, Thermo<TF>& thermo, Timeloop<TF>& timeloop)
 {
     auto& gd = grid.get_grid_data();
-    auto flx = fields.get_tmp();
+    auto output = fields.get_tmp();
 
     for (auto& it : dumplist)
     {
         if (it == "rflx")
         {
-            get_radiation_field(*flx,"rflx",thermo,timeloop);
+            get_radiation_field(*output,"rflx",thermo,timeloop);
         }
         else if (it == "sflx")
         {
-            get_radiation_field(*flx,"sflx",thermo,timeloop);
+            get_radiation_field(*output,"sflx",thermo,timeloop);
         }
         else
         {
             master.print_error("Radiation dump of field \"%s\" not supported\n", it.c_str());
             throw std::runtime_error("Error in Radiation Dump");
         }
-        dump.save_dump(flx->fld.data(), it, iotime);
+        dump.save_dump(output->fld.data(), it, iotime);
     }
-    fields.release_tmp(flx);
+    fields.release_tmp(output);
 }
 
 template class Radiation<double>;
