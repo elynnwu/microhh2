@@ -520,10 +520,6 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time, Timeloop<TF>& timeloop
         current_datetime = timeloop.get_phytime();
         mktime ( &current_datetime ); //refresh time
         double mu = calc_zenith(current_datetime, lat);
-        std::cout << "Current jday: " << current_datetime.tm_yday
-                  << ", hour: " << current_datetime.tm_hour
-                  << ", minute: " << current_datetime.tm_min
-                  << ", zenith: " << mu << std::endl;
         exec_gcss_rad<TF>(
             fields.st.at("thl")->fld.data(), ql->fld.data(), fields.sp.at("qt")->fld.data(),
             lwp->fld.data(), flx->fld.data(), swn->fld.data(), fields.rhoref.data(),
