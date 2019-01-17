@@ -139,7 +139,7 @@ namespace
         TF c2 = (xp23p*t3*exmu0 - t1*ap23b*exmk) / (xp23p*t2*expk - xm23p*t1*exmk);
         TF c1 = (ap23b - c2*xm23p)/xp23p;
 
-        for (int k=kend;k<kstart;--k)
+        for (int k=kend-1;k>=kstart;--k)
         {
             const int ijk  = i + j*jj + k*kk;
             taupath = taupath + taude[k];
@@ -150,11 +150,10 @@ namespace
     }
 
     template<typename TF>
-    void calc_gcss_rad_SW(const TF* const restrict ql, const TF* const restrict qt, const TF* const restrict rhoref,
-        const TF* const z, const TF* const dzi, TF* const restrict swn,
+    void calc_gcss_rad_SW(TF* const restrict swn, const TF* const restrict ql, const TF* const restrict qt,
+        const TF* const restrict rhoref, const TF* const z, const TF* const dzi,
         const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
-        const int icells, const int ijcells, double mu
-    )
+        const int icells, const int ijcells, const int ncells, double mu)
     {
         const int jj = icells;
         const int kk = ijcells;
@@ -164,6 +163,8 @@ namespace
         TF fact;
         int ki; //PBLH index
         std::vector<TF> tau(kend,TF(0.));
+        for (int n=0; n<ncells; ++n)
+            swn[n] = TF(0.); //initialize as 0 otherwise weird things might be stored
         for (int j=jstart; j<jend; ++j)
         {
             for (int i=istart; i<iend; ++i)
@@ -183,8 +184,7 @@ namespace
                 }
                 sunray<TF>(TF(mu), i, j,
                     kstart, kend, icells, ijcells,
-                    tau, tauc,
-                    swn);
+                    tau, tauc, swn);
             }
         }
     }
@@ -245,7 +245,7 @@ namespace
             TF* const restrict lwp, TF* const restrict flx, TF* const restrict swn, const TF* const restrict rhoref,
             const TF* const z, const TF* const dzi,
             const int istart, const int iend, const int jstart, const int jend, const int kstart, const int kend,
-            const int icells, const int ijcells, double mu)
+            const int icells, const int ijcells, const int ncells, double mu)
     {
         const int jj = icells;
         const int kk = ijcells;
@@ -272,10 +272,10 @@ namespace
         } // end of j
         if (mu>0.035) //if daytime, call SW
         {
-            calc_gcss_rad_SW<TF>(ql, qt, rhoref,
-                z, dzi, swn,
+            calc_gcss_rad_SW<TF>(swn, ql, qt,
+                rhoref, z, dzi,
                 istart, iend, jstart, jend, kstart, kend,
-                icells, ijcells, mu);
+                icells, ijcells, ncells, mu);
             for (int j=jstart; j<jend; ++j)
             {
                 for (int i=istart; i<iend; ++i)
@@ -287,7 +287,6 @@ namespace
                         const int km1 = std::max(kstart+1,k-1);
                         const int ijkm = i + j*jj + km1*kk;
                         tt[ijk] = tt[ijk] + (swn[ijk] - swn[ijkm]) * dzi[k] / (rhoref[k] * cp);
-                        if ((i==10)&(j==10)) std::cout << "k = " << k << ", swn = " << swn[ijk] << "\n";
                     }
                 }
             }
@@ -515,6 +514,7 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time, Timeloop<TF>& timeloop
         auto flx = fields.get_tmp();
         auto swn = fields.get_tmp();
         auto ql  = fields.get_tmp();
+        thermo.get_thermo_field(*ql,"ql",false,false);
         struct tm current_datetime;
         double lat = 32.5;
         current_datetime = timeloop.get_phytime();
@@ -529,7 +529,7 @@ void Radiation<TF>::exec(Thermo<TF>& thermo, double time, Timeloop<TF>& timeloop
             lwp->fld.data(), flx->fld.data(), swn->fld.data(), fields.rhoref.data(),
             gd.z.data(), gd.dzhi.data(),
             gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-            gd.icells, gd.ijcells, mu);
+            gd.icells, gd.ijcells, gd.ncells, mu);
         fields.release_tmp(lwp);
         fields.release_tmp(flx);
         fields.release_tmp(swn);
@@ -575,10 +575,10 @@ void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name, Ther
             auto lwp = fields.get_tmp();
             auto ql  = fields.get_tmp();
             thermo.get_thermo_field(*ql,"ql",false,false);
-            calc_gcss_rad_SW(ql->fld.data(), fields.ap.at("qt")->fld.data(), fields.rhoref.data(),
-                gd.z.data(), gd.dzi.data(), fld.fld.data(),
+            calc_gcss_rad_SW(fld.fld.data(), ql->fld.data(), fields.ap.at("qt")->fld.data(),
+                fields.rhoref.data(), gd.z.data(), gd.dzi.data(),
                 gd.istart, gd.iend, gd.jstart, gd.jend, gd.kstart, gd.kend,
-                gd.icells, gd.ijcells, mu);
+                gd.icells, gd.ijcells, gd.ncells, mu);
             fields.release_tmp(lwp);
             fields.release_tmp(ql);
         }
@@ -586,7 +586,10 @@ void Radiation<TF>::get_radiation_field(Field3d<TF>& fld, std::string name, Ther
         else //night time, set SW to 0
         {
             for (int n=0; n<gd.ncells; ++n)
-            fld.fld[n] = TF(0.);
+            {
+                fld.fld[n] = TF(0.);
+            }
+
         }
 
     }
