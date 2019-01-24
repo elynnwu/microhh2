@@ -23,6 +23,7 @@
 #ifndef RADIATION
 #define RADIATION
 
+#include <memory>
 #include <vector>
 #include "field3d_operators.h"
 
