@@ -120,8 +120,8 @@ Model<TF>::Model(Master& masterin, int argc, char *argv[]) :
         pres      = Pres<TF>     ::factory(master, *grid, *fields, *fft, *input);
         thermo    = Thermo<TF>   ::factory(master, *grid, *fields, *input);
         microphys = Microphys<TF>::factory(master, *grid, *fields, *input);
+        radiation = Radiation<TF>::factory(master, *grid, *fields, *input);
 
-        radiation = std::make_shared<Radiation<TF>>(master, *grid, *fields, *input);
         force     = std::make_shared<Force    <TF>>(master, *grid, *fields, *input);
         buffer    = std::make_shared<Buffer   <TF>>(master, *grid, *fields, *input);
         decay     = std::make_shared<Decay    <TF>>(master, *grid, *fields, *input);
