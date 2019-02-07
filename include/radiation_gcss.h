@@ -76,7 +76,7 @@ class Radiation_gcss : public Radiation<TF>
 	private:
 		//cross sections
 		std::vector<std::string> crosslist;        ///< List with all crosses from ini file
-        bool swcross_rflx;
+		bool swcross_rflx;
         std::vector<std::string> dumplist;         ///< List with all 3d dumps from the ini file.
 
 		void create_stats(Stats<TF>&);   ///< Initialization of the statistics.

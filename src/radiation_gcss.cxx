@@ -19,7 +19,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MicroHH.  If not, see <http://www.gnu.org/licenses/>.
  */
- 
+
  #include "radiation_gcss.h"
 
  namespace
@@ -324,7 +324,7 @@ bool Radiation_gcss<TF>::check_field_exists(const std::string name)
 template<typename TF>
 void Radiation_gcss<TF>::get_radiation_field(Field3d<TF>& fld, std::string name, Thermo<TF>& thermo, Timeloop<TF>& timeloop)
 {
-    if (name == "rflx")
+    if (name == "lflx")
     {
         auto& gd = grid.get_grid_data();
         auto lwp = fields.get_tmp();
@@ -377,13 +377,8 @@ void Radiation_gcss<TF>::create_stats(Stats<TF>& stats)
 {
     if (stats.get_switch())
     {
-        stats.add_prof("rflx", "Total radiative flux", "W m-2", "z");
         stats.add_prof("sflx", "Total shortwave radiative flux", "W m-2", "z");
-        //when full radiation is available, add the following:
-        // stats.add_prof("sflxd", "Downward shortwave radiative flux", "W m-2", "z");
-        // stats.add_prof("sflxu", "Upward shortwave radiative flux", "W m-2", "z");
-        // stats.add_prof("lflxd", "Downward longwave radiative flux", "W m-2", "z");
-        // stats.add_prof("lflxu", "Upward longwave radiative flux", "W m-2", "z");
+        stats.add_prof("lflx", "Total longwave radiative flux", "W m-2", "z");
     }
 }
 
@@ -393,8 +388,8 @@ void Radiation_gcss<TF>::create_column(Column<TF>& column)
     // add the profiles to the columns
     if (column.get_switch())
     {
-        column.add_prof("rflx", "Total radiative flux", "W m-2", "z");
         column.add_prof("sflx", "Total shortwave radiative flux", "W m-2", "z");
+        column.add_prof("lflx", "Total longwave radiative flux", "W m-2", "z");
     }
 }
 
@@ -406,7 +401,7 @@ void Radiation_gcss<TF>::create_cross(Cross<TF>& cross)
         swcross_rflx = false;
 
         // Vectors with allowed cross variables for radiative flux
-        std::vector<std::string> allowed_crossvars_rflx = {"rflx","sflx"};
+        std::vector<std::string> allowed_crossvars_rflx = {"sflx","lflx"};
 
         std::vector<std::string> rflxvars  = cross.get_enabled_variables(allowed_crossvars_rflx);
         if (rflxvars.size() > 0)
@@ -447,9 +442,9 @@ void Radiation_gcss<TF>::exec_stats(Stats<TF>& stats, Thermo<TF>& thermo, Timelo
     const TF no_offset = 0.;
     const TF no_threshold = 0.;
 
-    auto flx = fields.get_tmp();
-    flx->loc = gd.sloc;
-    get_radiation_field(*flx,"rflx",thermo, timeloop);
+    auto lflx = fields.get_tmp();
+    lflx->loc = gd.sloc;
+    get_radiation_field(*lflx,"lflx",thermo, timeloop);
 
     auto sflx = fields.get_tmp();
     sflx->loc = gd.sloc;
@@ -459,10 +454,10 @@ void Radiation_gcss<TF>::exec_stats(Stats<TF>& stats, Thermo<TF>& thermo, Timelo
     //if daytime, rflx = LW + SW
     // calculate the mean
     std::vector<std::string> operators = {"mean"}; //add 2nd moment, if needed
-    stats.calc_stats("rflx", *flx, no_offset, no_threshold, operators);
+    stats.calc_stats("lflx", *lflx, no_offset, no_threshold, operators);
     stats.calc_stats("sflx", *sflx, no_offset, no_threshold, operators);
 
-    fields.release_tmp(flx);
+    fields.release_tmp(lflx);
     fields.release_tmp(sflx);
 }
 
@@ -474,8 +469,8 @@ void Radiation_gcss<TF>::exec_column(Column<TF>& column, Thermo<TF>& thermo, Tim
 
     auto flx = fields.get_tmp();
     flx->loc = gd.sloc;
-    get_radiation_field(*flx,"rflx",thermo,timeloop);
-    column.calc_column("rflx", flx->fld.data(), no_offset);
+    get_radiation_field(*flx,"lflx",thermo,timeloop);
+    column.calc_column("lflx", flx->fld.data(), no_offset);
 
     get_radiation_field(*flx,"sflx",thermo,timeloop);
     column.calc_column("sflx", flx->fld.data(), no_offset);
@@ -487,23 +482,24 @@ template<typename TF>
 void Radiation_gcss<TF>::exec_cross(Cross<TF>& cross, unsigned long iotime, Thermo<TF>& thermo, Timeloop<TF>& timeloop)
 {
     auto& gd = grid.get_grid_data();
-    auto flx = fields.get_tmp();
+    auto lflx = fields.get_tmp();
     auto sflx = fields.get_tmp();
 
-    flx->loc = gd.sloc;
+    lflx->loc = gd.sloc;
     sflx->loc = gd.sloc;
     if(swcross_rflx)
     {
-        get_radiation_field(*flx,"rflx",thermo,timeloop);
+        get_radiation_field(*lflx,"lflx",thermo,timeloop);
+        get_radiation_field(*sflx,"sflx",thermo,timeloop);
     }
     for (auto& it : crosslist)
     {
-        if (it == "rflx")
-            cross.cross_simple(flx->fld.data(), "rflx", iotime);
+        if (it == "lflx")
+            cross.cross_simple(lflx->fld.data(), "lflx", iotime);
         else if (it == "sflx")
             cross.cross_simple(sflx->fld.data(), "sflx", iotime);
     }
-    fields.release_tmp(flx);
+    fields.release_tmp(lflx);
     fields.release_tmp(sflx);
 }
 
@@ -515,9 +511,9 @@ void Radiation_gcss<TF>::exec_dump(Dump<TF>& dump, unsigned long iotime, Thermo<
 
     for (auto& it : dumplist)
     {
-        if (it == "rflx")
+        if (it == "lflx")
         {
-            get_radiation_field(*output,"rflx",thermo,timeloop);
+            get_radiation_field(*output,"lflx",thermo,timeloop);
         }
         else if (it == "sflx")
         {

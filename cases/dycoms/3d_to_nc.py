@@ -3,13 +3,13 @@ import struct  as st
 import netCDF4 as nc4
 
 # Settings -------
-variable   = 'sflx'
-nx         = 16
-ny         = 16
-nz         = 256
+variable   = 'v'
+nx         = 50
+ny         = 50
+nz         = 131
 starttime  = 0
-sampletime = 3600
-endtime    = 43200
+sampletime = 60
+endtime    = 300
 iotimeprec = 0
 nxsave     = nx
 nysave     = ny

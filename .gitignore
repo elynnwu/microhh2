@@ -6,4 +6,7 @@ config/
 *Store
 *00
 microhh
-*.out
+cases/dycoms/*out
+*.py
+cases/dycoms/*prof
+cases/dycoms/*0
