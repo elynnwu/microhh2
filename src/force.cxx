@@ -3,8 +3,6 @@
  * Copyright (c) 2011-2018 Chiel van Heerwaarden
  * Copyright (c) 2011-2018 Thijs Heus
  * Copyright (c) 2014-2018 Bart van Stratum
- * Copyright (c) 2018 Elynn Wu
- * Copyright (c) 2018 Monica Zamora Zapata
  * This file is part of MicroHH
  *
  * MicroHH is free software: you can redistribute it and/or modify
@@ -18,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MicroHH.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <iostream>
+
 #include <cstdio>
 #include <cmath>
 #include <math.h>

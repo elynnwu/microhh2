@@ -35,7 +35,6 @@ template<typename> class Grid;
 template<typename> class Fields;
 template<typename> class Field3d_operators;
 template<typename> class Timedep;
-template<typename> class Thermo;
 
 /**
  * Class for the right-hand side terms that contain large-scale forcings
@@ -49,7 +48,6 @@ enum class Large_scale_pressure_type {disabled, fixed_flux, geo_wind};
 enum class Large_scale_tendency_type {disabled, enabled};
 enum class Large_scale_subsidence_type {disabled, enabled};
 enum class Nudging_type {disabled, enabled};
-enum class Gcss_rad_type {disabled, enabled};
 
 template<typename TF>
 class Force
@@ -93,7 +91,6 @@ class Force
         Large_scale_tendency_type swls;
         Large_scale_subsidence_type swwls;
         Nudging_type swnudge;
-        Gcss_rad_type gcssrad;
 
         TF uflux; ///< Mean velocity used to enforce constant flux.
         TF fc;    ///< Coriolis parameter.
