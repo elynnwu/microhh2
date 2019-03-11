@@ -254,6 +254,20 @@ void Boundary<TF>::process_time_dependent(Input& input, Netcdf_handle& input_nc)
                 if (ittmp != tmplist.end())
                     tmplist.erase(ittmp);
             }
+
+            std::string name = it.first+"_inflowBC";
+            if (std::find(timedeplist.begin(), timedeplist.end(), name) != timedeplist.end())
+            {
+                // Process the time dependent data profile.
+                tdep_bc.emplace(it.first, new Timedep<TF>(master, grid, name, true));
+                tdep_bc.at(it.first)->create_timedep_prof(input_nc);
+
+                // Remove the item from the tmplist.
+                std::vector<std::string>::iterator ittmp = std::find(tmplist.begin(), tmplist.end(), name);
+                if (ittmp != tmplist.end())
+                    tmplist.erase(ittmp);
+            }
+
         }
 
         // Display a warning for the non-supported.
