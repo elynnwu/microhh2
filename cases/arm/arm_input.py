@@ -113,10 +113,14 @@ nc_qt [:] = qt [:]
 nc_u  [:] = u  [:]
 nc_ug [:] = ug [:]
 
+time_inflowBC = np.array([  0., 1., 2., 3.])
+time_inflowBC *= 3600. # h to s
+
 # Create a group called "timedep" for the timedep.
 nc_group_timedep = nc_file.createGroup("timedep")
 nc_group_timedep.createDimension("time_surface", time_surface.size)
 nc_group_timedep.createDimension("time_ls", time_ls.size)
+nc_group_timedep.createDimension("time_inflowBC", time_inflowBC.size)
 
 nc_time_surface = nc_group_timedep.createVariable("time_surface", float_type, ("time_surface"))
 nc_thl_sbot = nc_group_timedep.createVariable("thl_sbot", float_type, ("time_surface"))
@@ -131,5 +135,23 @@ nc_qt_ls   = nc_group_timedep.createVariable("qt_ls"  , float_type, ("time_ls", 
 nc_time_ls[:]   = time_ls[:]
 nc_thl_ls [:,:] = thlls  [:,:]
 nc_qt_ls  [:,:] = qtls   [:,:]
+
+# B.C. hard code for now
+nc_time_inflowBC = nc_group_timedep.createVariable("time_inflowBC", float_type, ("time_inflowBC"))
+nc_thl_inflowBC  = nc_group_timedep.createVariable("thl_inflowBC" , float_type, ("time_inflowBC", "z"))
+nc_qt_inflowBC   = nc_group_timedep.createVariable("qt_inflowBC"  , float_type, ("time_inflowBC", "z"))
+nc_time_inflowBC[:]   = time_inflowBC[:]
+thl_inflowBC  = np.zeros((time_inflowBC.size, kmax))
+qt_inflowBC   = np.zeros((time_inflowBC.size, kmax))
+for t in range(len(time_inflowBC)):
+    for k in range(kmax):
+        if z[k] <= 1000.: # just set something warm and moist
+            thl_inflowBC[t,k] = 300.
+            qt_inflowBC[t,k] = 9.E-4
+        else: # just set something dry
+            thl_inflowBC[t,k] = 310.
+            qt_inflowBC[t,k] = 1.E-4
+nc_thl_inflowBC [:,:] = thl_inflowBC  [:,:]
+nc_qt_inflowBC  [:,:] = qt_inflowBC   [:,:]
 
 nc_file.close()
