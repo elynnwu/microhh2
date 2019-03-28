@@ -34,7 +34,7 @@
 
      template<typename TF>
      void set_inflow_BC_Dirichlet(
-         TF* const restrict data, const TF value,
+         TF* const restrict data, const TF* const restrict value,
          const int igc, const int jj, const int kk,
          const int jcells, const int kcells)
      {
@@ -209,7 +209,7 @@ void Boundary_non_cyclic<TF>::exec()
 
     for (auto& it : inflowBClist)
     set_inflow_BC_Dirichlet<TF>(
-        fields.at.at(it)->fld.data(), inflowBCprofs.at(it).data(),
+        fields.sp.at(it)->fld.data(), inflowBCprofs.at(it).data(),
         gd.igc, jj, kk,
         gd.jcells, gd.kcells);
 }
