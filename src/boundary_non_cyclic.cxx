@@ -44,7 +44,7 @@
                  for (int i=0; i<igc; ++i)
                  {
                      const int ijk0 = i + j*jj + k*kk;
-                     data[ijk0] = value;
+                     data[ijk0] = value[k];
                  }
      }
 
