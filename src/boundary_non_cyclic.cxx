@@ -41,7 +41,7 @@
          for (int k=0; k<kcells; ++k)
              for (int j=0; j<jcells; ++j)
                  #pragma ivdep
-                 for (int i=0; i<igc; ++i)
+                 for (int i=0; i<igc+1; ++i)
                  {
                      const int ijk0 = i + j*jj + k*kk;
                      data[ijk0] = value[k];
@@ -143,7 +143,7 @@ Boundary_non_cyclic<TF>::Boundary_non_cyclic(Master& masterin, Grid<TF>& gridin,
 
         if (inputin.get_item<bool>("boundary", "swtimedep_inflowBC", "", false))
         {
-            std::vector<std::string> tdepvars = inputin.get_list<std::string>("boundary", "timedep_inflowBC", "", std::vector<std::string>());
+            std::vector<std::string> tdepvars = inputin.get_list<std::string>("boundary", "timedeplist_inflowBC", "", std::vector<std::string>());
             for (auto& it : tdepvars)
                 tdep_inflowBC.emplace(it, new Timedep<TF>(master, grid, it+"_inflowBC", true));
         }
@@ -198,6 +198,22 @@ void Boundary_non_cyclic<TF>::create(Input& inputin, Netcdf_handle& input_nc)
             it.second->create_timedep_prof(input_nc, offset);
     }
 }
+
+#ifndef USECUDA
+template <typename TF>
+void Boundary_non_cyclic<TF>::update_time_dependent(Timeloop<TF>& timeloop)
+{
+    const Grid_data<TF>& gd = grid.get_grid_data();
+
+    const TF no_offset = 0.;
+
+    if (swinflowBC == Impose_inflow_BC_type::enabled)
+    {
+        for (auto& it : tdep_inflowBC)
+            it.second->update_time_dependent_prof(inflowBCprofs.at(it.first), timeloop);
+    }
+}
+#endif
 
 template<typename TF>
 void Boundary_non_cyclic<TF>::exec()

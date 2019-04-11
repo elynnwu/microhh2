@@ -37,6 +37,7 @@
 #include "timeloop.h"
 #include "fft.h"
 #include "boundary.h"
+#include "boundary_non_cyclic.h"
 #include "advec.h"
 #include "diff.h"
 #include "pres.h"
@@ -123,13 +124,14 @@ Model<TF>::Model(Master& masterin, int argc, char *argv[]) :
         microphys = Microphys<TF>::factory(master, *grid, *fields, *input);
         radiation = Radiation<TF>::factory(master, *grid, *fields, *input);
 
-        force     = std::make_shared<Force    <TF>>(master, *grid, *fields, *input);
-        buffer    = std::make_shared<Buffer   <TF>>(master, *grid, *fields, *input);
-        decay     = std::make_shared<Decay    <TF>>(master, *grid, *fields, *input);
-        stats     = std::make_shared<Stats    <TF>>(master, *grid, *fields, *advec, *diff, *input);
-        column    = std::make_shared<Column   <TF>>(master, *grid, *fields, *input);
-        dump      = std::make_shared<Dump     <TF>>(master, *grid, *fields, *input);
-        cross     = std::make_shared<Cross    <TF>>(master, *grid, *fields, *input);
+        boundary_non_cyclic = std::make_shared<Boundary_non_cyclic    <TF>>(master, *grid, *fields, *input);
+        force               = std::make_shared<Force    <TF>>(master, *grid, *fields, *input);
+        buffer              = std::make_shared<Buffer   <TF>>(master, *grid, *fields, *input);
+        decay               = std::make_shared<Decay    <TF>>(master, *grid, *fields, *input);
+        stats               = std::make_shared<Stats    <TF>>(master, *grid, *fields, *advec, *diff, *input);
+        column              = std::make_shared<Column   <TF>>(master, *grid, *fields, *input);
+        dump                = std::make_shared<Dump     <TF>>(master, *grid, *fields, *input);
+        cross               = std::make_shared<Cross    <TF>>(master, *grid, *fields, *input);
 
         // Parse the statistics masks
         add_statistics_masks();
@@ -176,6 +178,7 @@ void Model<TF>::init()
     microphys->init();
     radiation->init();
     decay->init(*input);
+    boundary_non_cyclic->init();
 
     stats->init(timeloop->get_ifactor());
     column->init(timeloop->get_ifactor());
@@ -228,6 +231,7 @@ void Model<TF>::load()
     boundary->create(*input, *input_nc, *stats);
     buffer->create(*input, *input_nc);
     force->create(*input, *input_nc);
+    boundary_non_cyclic->create(*input, *input_nc);
     thermo->create(*input, *input_nc, *stats, *column, *cross, *dump);
     microphys->create(*input, *input_nc, *stats, *cross, *dump);
     radiation->create(*thermo,*stats, *column, *cross, *dump); // Radiation needs to be created after thermo as it needs base profiles.
@@ -268,9 +272,10 @@ void Model<TF>::exec()
     master.print_message("Starting time integration\n");
 
     // Update the time dependent parameters.
-    boundary->update_time_dependent(*timeloop);
-    thermo  ->update_time_dependent(*timeloop);
-    force   ->update_time_dependent(*timeloop);
+    boundary            ->update_time_dependent(*timeloop);
+    thermo              ->update_time_dependent(*timeloop);
+    force               ->update_time_dependent(*timeloop);
+    boundary_non_cyclic ->update_time_dependent(*timeloop);
 
     // Set the boundary conditions.
     boundary->exec(*thermo);
@@ -336,6 +341,9 @@ void Model<TF>::exec()
                 // Apply the large scale forcings. Keep this one always right before the pressure.
                 force->exec(timeloop->get_sub_time_step()); //adding thermo and time because of gcssrad
 
+                // Apply the non-cyclic part of B.C.
+                boundary_non_cyclic->exec();
+                
                 // Solve the poisson equation for pressure.
                 boundary->set_ghost_cells_w(Boundary_w_type::Conservation_type);
                 pres->exec(timeloop->get_sub_time_step());

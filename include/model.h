@@ -45,6 +45,7 @@ template<typename> class Force;
 template<typename> class Thermo;
 template<typename> class Microphys;
 template<typename> class Radiation;
+template<typename> class Boundary_non_cyclic;
 
 template<typename> class Decay;
 
@@ -89,6 +90,7 @@ class Model
         std::shared_ptr<Thermo<TF>> thermo;
         std::shared_ptr<Microphys<TF>> microphys;
         std::shared_ptr<Radiation<TF>> radiation;
+        std::shared_ptr<Boundary_non_cyclic<TF>> boundary_non_cyclic;
 
         std::shared_ptr<Decay<TF>> decay;
 

@@ -34,6 +34,8 @@
 #include "finite_difference.h"
 
 #include "boundary_cyclic.h"
+#include "boundary_non_cyclic.h"
+
 
 // Boundary schemes.
 #include "boundary.h"

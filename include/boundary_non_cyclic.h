@@ -37,7 +37,7 @@ template<typename> class Fields;
 template<typename> class Field3d_operators;
 template<typename> class Timedep;
 
-enum class Edge {East_west_edge, North_south_edge, Both_edges};
+// enum class Edge {East_west_edge, North_south_edge, Both_edges};
 enum class Impose_inflow_BC_type {disabled, enabled};
 
 template<typename TF>
