@@ -120,21 +120,21 @@ void Boundary_cyclic<TF>::exec(TF* const restrict data, Edge edge)
 
     const int ncount = 1;
 
-    if (edge == Edge::East_west_edge || edge == Edge::Both_edges)
-    {
-        // Communicate east-west edges.
-        const int eastout = gd.iend-gd.igc;
-        const int westin  = 0;
-        const int westout = gd.istart;
-        const int eastin  = gd.iend;
-
-        // Send and receive the ghost cells in east-west direction.
-        MPI_Isend(&data[eastout], ncount, eastwestedge, md.neast, 1, md.commxy, master.get_request_ptr());
-        MPI_Irecv(&data[ westin], ncount, eastwestedge, md.nwest, 1, md.commxy, master.get_request_ptr());
-        MPI_Isend(&data[westout], ncount, eastwestedge, md.nwest, 2, md.commxy, master.get_request_ptr());
-        MPI_Irecv(&data[ eastin], ncount, eastwestedge, md.neast, 2, md.commxy, master.get_request_ptr());
-        master.wait_all();
-    }
+    // if (edge == Edge::East_west_edge || edge == Edge::Both_edges)
+    // {
+    //     // Communicate east-west edges.
+    //     const int eastout = gd.iend-gd.igc;
+    //     const int westin  = 0;
+    //     const int westout = gd.istart;
+    //     const int eastin  = gd.iend;
+    //
+    //     // Send and receive the ghost cells in east-west direction.
+    //     MPI_Isend(&data[eastout], ncount, eastwestedge, md.neast, 1, md.commxy, master.get_request_ptr());
+    //     MPI_Irecv(&data[ westin], ncount, eastwestedge, md.nwest, 1, md.commxy, master.get_request_ptr());
+    //     MPI_Isend(&data[westout], ncount, eastwestedge, md.nwest, 2, md.commxy, master.get_request_ptr());
+    //     MPI_Irecv(&data[ eastin], ncount, eastwestedge, md.neast, 2, md.commxy, master.get_request_ptr());
+    //     master.wait_all();
+    // }
 
     if (edge == Edge::North_south_edge || edge == Edge::Both_edges)
     {

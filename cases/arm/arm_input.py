@@ -145,13 +145,28 @@ thl_inflowBC  = np.zeros((time_inflowBC.size, kmax))
 qt_inflowBC   = np.zeros((time_inflowBC.size, kmax))
 for t in range(len(time_inflowBC)):
     for k in range(kmax):
-        if z[k] <= 1000.: # just set something warm and moist
-            thl_inflowBC[t,k] = 300.
-            qt_inflowBC[t,k] = 9.E-4
-        else: # just set something dry
-            thl_inflowBC[t,k] = 310.
-            qt_inflowBC[t,k] = 1.E-4
+        if z[k] <= 50.:
+            thl_inflowBC[t,k] = 299.0  + (z[k]     )*(301.5 -299.0 )/(50.)
+            qt_inflowBC[t,k] = 15.20  + (z[k]     )*(15.17 -15.20 )/(50.)
+        elif z[k] <=  350.:
+            thl_inflowBC[t,k] = 301.5  + (z[k]-  50.)*(302.5 -301.5 )/(350.-50.)
+            qt_inflowBC[t,k] = 15.17  + (z[k]-  50.)*(14.98 -15.17 )/(350.-50.)
+        elif z[k] <=  650.:
+            thl_inflowBC[t,k] = 302.5  + (z[k]- 350.)*(303.53-302.5 )/(650.-350.)
+            qt_inflowBC[t,k] = 14.98  + (z[k]- 350.)*(14.80 -14.98 )/(650.-350.)
+        elif z[k] <=  700.:
+            thl_inflowBC[t,k] = 303.53 + (z[k]- 650.)*(303.7 -303.53)/(700.-650.)
+            qt_inflowBC[t,k] = 14.80  + (z[k]- 650.)*(14.70 -14.80 )/(700.-650.)
+        elif z[k] <= 1300.:
+            thl_inflowBC[t,k] = 303.7  + (z[k]- 700.)*(307.13-303.7 )/(1300.-700.)
+            qt_inflowBC[t,k] = 14.70  + (z[k]- 700.)*( 13.50-14.80 )/(1300.-700.)
+        elif z[k] <= 2500.:
+            thl_inflowBC[t,k] = 307.13 + (z[k]-1300.)*(314.0 -307.13)/(2500.-1300.)
+            qt_inflowBC[t,k] = 13.50  + (z[k]-1300.)*( 3.00 - 13.50)/(2500.-1300.)
+        elif z[k] <= 5500.:
+            thl_inflowBC[t,k] = 314.0  + (z[k]-2500.)*(343.2 -314.0 )/(5500.-2500.)
+            qt_inflowBC[t,k] =  3.00
 nc_thl_inflowBC [:,:] = thl_inflowBC  [:,:]
-nc_qt_inflowBC  [:,:] = qt_inflowBC   [:,:]
+nc_qt_inflowBC  [:,:] = qt_inflowBC   [:,:] / 1000.
 
 nc_file.close()
